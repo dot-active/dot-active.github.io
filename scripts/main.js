@@ -18,9 +18,9 @@ const myapp = Vue.createApp({
             } else if (size == 2) {
                 this.fontSize = 'text-base';
             } else if (size == 3) {
-                this.fontSize = 'text-lg';
-            } else if (size == 4) {
                 this.fontSize = 'text-xl';
+            } else if (size == 4) {
+                this.fontSize = 'text-3xl';
             }
         },
         showmenufunction(){
