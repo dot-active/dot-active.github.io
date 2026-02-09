@@ -13,7 +13,7 @@
 
     <topbar :title="novelTitle" :languages="languages" @select-font-size="updateFontSize" @showmenu="showmenufunction" @day-night-mode="dayNightMode" @lang-change="langChange"></topbar>
     <div :class="[fontSize, showmenu, nightmode, 'novel-body']">
-      <novel-viewer :novelurl="'https://raw.githubusercontent.com/pinktit/buried-seed/main/'" :languages="['cn', 'tw', 'en']" :lang="lang" @hidemenu="hidemenufunction" @languages-loaded="setLanguages" @title-loaded="setTitle"></novel-viewer>
+      <novel-viewer :novelurl="'https://raw.githubusercontent.com/dot-active/buried-seed/main/'" :languages="['cn', 'tw', 'en']" :lang="lang" @hidemenu="hidemenufunction" @languages-loaded="setLanguages" @title-loaded="setTitle"></novel-viewer>
     </div>
 
   </div>
