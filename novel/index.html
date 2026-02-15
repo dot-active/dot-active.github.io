@@ -1,12 +1,296 @@
-<html>
+<!DOCTYPE html>
+<html lang="en">
 <head>
-<title>Dotactive Novels</title>
+  <title>Dotactive Novels</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link href="../dist/output.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400;1,700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Inter', sans-serif; background-color: #f5f1eb; color: #333; }
+    .font-display { font-family: 'Playfair Display', serif; }
+
+    /* Top Bar */
+    .top-bar { border-bottom: 1px solid #e0dbd4; }
+    .top-bar a { color: #777; font-size: 13px; transition: color 0.3s; }
+    .top-bar a:hover { color: #333; }
+
+    /* Navigation */
+    .main-nav { border-bottom: 1px solid #e0dbd4; }
+    .brand { font-family: 'Playfair Display', serif; font-size: 28px; font-weight: 700; letter-spacing: 3px; color: #333; text-transform: uppercase; }
+    .nav-link { font-size: 13px; font-weight: 500; letter-spacing: 1.5px; text-transform: uppercase; color: #555; transition: color 0.3s; }
+    .nav-link:hover, .nav-link.active { color: #333; }
+
+    /* Hero Slider */
+    .hero-section { min-height: 80vh; position: relative; overflow: hidden; }
+    .hero-section::before {
+      content: '';
+      position: absolute;
+      right: -50px;
+      top: -50px;
+      width: 500px;
+      height: 500px;
+      border-radius: 50%;
+      background: rgba(220, 215, 205, 0.3);
+      z-index: 0;
+    }
+
+    .slide { display: none !important; }
+    .slide.active { display: flex !important; align-items: center; justify-content: space-between; gap: 60px; }
+    .slide.slide-right { animation: slideInRight 0.6s ease; }
+    .slide.slide-left { animation: slideInLeft 0.6s ease; }
+    @keyframes slideInRight { from { opacity: 0; transform: translateX(60px); } to { opacity: 1; transform: translateX(0); } }
+    @keyframes slideInLeft { from { opacity: 0; transform: translateX(-60px); } to { opacity: 1; transform: translateX(0); } }
+
+    .book-title { font-family: 'Playfair Display', serif; font-size: 52px; font-weight: 700; line-height: 1.15; color: #2a2a2a; margin-bottom: 24px; }
+    .book-title em { font-style: italic; color: #8a7d6b; }
+    .book-desc { font-size: 15px; line-height: 1.8; color: #888; max-width: 420px; margin-bottom: 32px; }
+
+    .read-btn {
+      display: inline-flex; align-items: center; gap: 10px;
+      padding: 14px 30px; border: 1.5px solid #333; background: transparent;
+      font-size: 12px; font-weight: 600; letter-spacing: 2px; text-transform: uppercase;
+      color: #333; cursor: pointer; transition: all 0.3s;
+      text-decoration: none;
+    }
+    .read-btn:hover { background: #333; color: #fff; }
+    .read-btn svg { transition: transform 0.3s; }
+    .read-btn:hover svg { transform: translateX(4px); }
+
+    /* 3D Book Cover */
+    .book-cover-wrapper { position: relative; z-index: 1; perspective: 1500px; }
+    .book-3d {
+      width: 300px; height: 450px;
+      margin: 0 auto;
+      position: relative;
+      transform-style: preserve-3d;
+      transform: rotateY(-25deg);
+    }
+    .book-front {
+      position: absolute;
+      left: -40px;
+      width: 100%; height: 100%;
+      background: #fff;
+      background-size: cover;
+      background-position: center;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+      border-radius: 3px 0 0 3px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 30px 24px 20px;
+      text-align: center;
+    }
+    .book-spine {
+      position: absolute;
+      width: 40px;
+      height: calc(100% - 12px);
+      top: 5px;
+      right: -14px;
+      transform-origin: left;
+      transform: rotateY(-90deg);
+      background: linear-gradient(to right, #d4c4a8 0%, #e8dcc8 50%, #d4c4a8 100%);
+      box-shadow: inset 0 0 15px rgba(0,0,0,0.2);
+    }
+    .book-shadow {
+      position: absolute;
+      width: 300px; height: 100px;
+      bottom: -2px; right: -230px;
+      background: linear-gradient(to top, rgba(0,0,0,0.3) 0%, rgba(0,0,0,0.1) 80%, transparent 100%);
+      transform: skewX(-70deg);
+      transform-origin: left top;
+      filter: blur(15px);
+      opacity: 0.6;
+      z-index: -1;
+    }
+    .book-cover-title {
+      font-family: 'Playfair Display', serif;
+      font-size: 24px;
+      font-weight: 700;
+      color: #2a2a2a;
+      margin-bottom: 10px;
+    }
+    .book-cover-title em { color: #8a7d6b; }
+    .book-cover-icon {
+      width: 180px; height: 180px;
+      margin: 15px 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 100px;
+    }
+    .book-cover-author {
+      font-size: 12px;
+      color: #999;
+      letter-spacing: 1px;
+      margin-top: auto;
+      padding-bottom: 5px;
+    }
+
+    /* Arrows */
+    .slider-arrow {
+      width: 50px; height: 50px; border-radius: 50%;
+      border: 1.5px solid #ccc; background: transparent;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; transition: all 0.3s; color: #999;
+      position: absolute; top: 50%; transform: translateY(-50%);
+      z-index: 2;
+    }
+    .slider-arrow:hover { border-color: #333; color: #333; }
+    .slider-arrow.prev { left: 30px; }
+    .slider-arrow.next { right: 30px; }
+
+    /* Dots */
+    .slider-dots { display: flex; gap: 10px; margin-top: 40px; }
+    .slider-dot {
+      width: 10px; height: 10px; border-radius: 50%;
+      background: #ccc; cursor: pointer; transition: background 0.3s;
+      border: none;
+    }
+    .slider-dot.active { background: #8a7d6b; }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      .book-title { font-size: 34px; }
+      .hero-content { flex-direction: column; text-align: center; gap: 40px; }
+      .book-desc { margin-left: auto; margin-right: auto; }
+      .slider-arrow { display: none; }
+      .book-3d { width: 240px; height: 340px; margin: 0 auto; }
+      .book-cover-icon { font-size: 70px; width: 140px; height: 140px; }
+      .book-shadow { display: none; }
+    }
+  </style>
 </head>
 <body>
-  <div class="fun-page">
-        <h1>Dotactive Novels</h1>
-        <h2 class="text-2xl font-bold text-center mt-8 animate-bounce">There are lots of cool stories on this site.</h2>
+
+  <!-- Top Bar -->
+  <div class="top-bar">
+    <div style="max-width: 1200px; margin: 0 auto; padding: 12px 40px; display: flex; justify-content: space-between; align-items: center;">
+      <div style="display: flex; gap: 18px;">
+        <a href="#">f</a>
+        <a href="#">in</a>
+        <a href="#">tw</a>
+      </div>
+      <div style="display: flex; gap: 24px; align-items: center;">
+        <a href="#" style="display: flex; align-items: center; gap: 6px;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21v-1a6 6 0 0 1 12 0v1"/></svg>
+          ACCOUNT
+        </a>
+        <span style="color: #ddd;">|</span>
+        <a href="#" style="display: flex; align-items: center; gap: 6px;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/></svg>
+          LIBRARY
+        </a>
+        <span style="color: #ddd;">|</span>
+        <a href="#" style="display: flex; align-items: center; gap: 6px;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          SEARCH
+        </a>
+      </div>
+    </div>
   </div>
+
+  <!-- Main Navigation -->
+  <nav class="main-nav">
+    <div style="max-width: 1200px; margin: 0 auto; padding: 20px 40px; display: flex; justify-content: space-between; align-items: center;">
+      <div class="brand">DOT-Novels</div>
+      <div style="display: flex; gap: 36px; align-items: center;">
+        <a href="#" class="nav-link active">HOME</a>
+        <a href="#" class="nav-link">ABOUT</a>
+        <a href="#" class="nav-link">PAGES</a>
+        <a href="#" class="nav-link">SHOP</a>
+        <a href="#" class="nav-link">ARTICLES</a>
+        <a href="#" class="nav-link">CONTACT</a>
+        <button style="background: none; border: none; cursor: pointer; font-size: 20px; color: #555; padding: 4px;">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+        </button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Hero Slider -->
+  <section class="hero-section" style="display: flex; align-items: center; justify-content: center; padding: 0 40px;">
+
+    <!-- Slide 1: Buried Seed -->
+    <div class="slide active hero-content" style="max-width: 1200px; width: 100%;" data-index="0">
+      <div style="flex: 1;">
+        <h1 class="book-title">Buried <em>Seed</em></h1>
+        <p class="book-desc">A captivating tale of resilience and growth. Follow the journey of seeds buried deep beneath the earth, waiting for their moment to break through and reach the light.</p>
+        <a href="./buried-seed.html" class="read-btn">
+          READ MORE
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+        </a>
+      </div>
+      <div class="book-cover-wrapper">
+        <div class="book-3d">
+          <div class="book-front" style="background-image: url('https://raw.githubusercontent.com/dot-active/buried-seed/main/cn/cover.jpg');"></div>
+          <div class="book-spine"></div>
+          <div class="book-shadow"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Slide 2: Sage Tuna -->
+    <div class="slide hero-content" style="max-width: 1200px; width: 100%;" data-index="1">
+      <div style="flex: 1;">
+        <h1 class="book-title">Sage <em>Tuna</em></h1>
+        <p class="book-desc">An extraordinary adventure through uncharted waters. Discover the wisdom of the ocean and the tales that swim beneath the surface of the everyday world.</p>
+        <a href="./sage-tuna.html" class="read-btn">
+          READ MORE
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+        </a>
+      </div>
+      <div class="book-cover-wrapper">
+        <div class="book-3d">
+          <div class="book-front" style="background-image: url('https://raw.githubusercontent.com/dot-active/sage-tuna/main/cn/cover.jpg');"></div>
+          <div class="book-spine"></div>
+          <div class="book-shadow"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Arrows -->
+    <button class="slider-arrow prev" onclick="changeSlide(-1)">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+    </button>
+    <button class="slider-arrow next" onclick="changeSlide(1)">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+    </button>
+  </section>
+
+  <!-- Dots -->
+  <div style="max-width: 1200px; margin: 0 auto; padding: 0 40px;">
+    <div class="slider-dots">
+      <button class="slider-dot active" onclick="goToSlide(0, -1)"></button>
+      <button class="slider-dot" onclick="goToSlide(1, 1)"></button>
+    </div>
+  </div>
+
+  <script>
+    const slides = document.querySelectorAll('.slide');
+    const dots = document.querySelectorAll('.slider-dot');
+    let current = 0;
+
+    function goToSlide(index, dir) {
+      slides[current].classList.remove('active', 'slide-left', 'slide-right');
+      dots[current].classList.remove('active');
+      current = index;
+      slides[current].classList.remove('slide-left', 'slide-right');
+      slides[current].classList.add('active', dir >= 0 ? 'slide-right' : 'slide-left');
+      dots[current].classList.add('active');
+    }
+
+    function changeSlide(dir) {
+      let next = (current + dir + slides.length) % slides.length;
+      goToSlide(next, dir);
+    }
+
+    // Auto-slide every 6 seconds
+    // setInterval(() => changeSlide(1), 6000);
+  </script>
+
   <script src="../scripts/loadhead.js"></script>
 </body>
 </html>
