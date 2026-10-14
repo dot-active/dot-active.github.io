@@ -51,25 +51,44 @@ body{
   padding-right:max(16px,env(safe-area-inset-right,0px));
 }
 .app{max-width:440px; margin:0 auto; display:flex; flex-direction:column; gap:12px}
-header{display:flex; align-items:baseline; justify-content:space-between; gap:8px}
-h1{margin:0; font-size:1.05rem; font-weight:600; letter-spacing:.06em}
-header span{color:var(--muted); font-size:.8rem}
 
 /* LCD */
 .lcd{
-  background:var(--lcd); color:var(--lcd-ink); border-radius:8px; padding:10px 12px 8px;
+  position:relative; background:var(--lcd); color:var(--lcd-ink); border-radius:8px; padding:10px 12px 8px;
   font-family:var(--f-lcd);
   box-shadow:inset 0 2px 5px var(--shadow-c), 0 0 0 1px var(--line);
   touch-action:none; user-select:none; -webkit-user-select:none; cursor:ns-resize;
 }
-.dial{min-height:1.3em; font-size:.95rem; letter-spacing:.14em; color:var(--lcd-dim); white-space:nowrap; overflow:hidden}
+.dial{min-height:1.3em; margin-right:40px; font-size:.95rem; letter-spacing:.14em; color:var(--lcd-dim); white-space:nowrap; overflow:hidden}
 .note{font-size:2.3rem; line-height:1.15; min-height:1.15em; font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
 .note.dim{color:var(--lcd-dim)}
 .note.many{font-size:1.35rem; line-height:1.9}
 .octrow{display:grid; grid-template-columns:repeat(5,1fr); gap:4px; margin-top:6px}
 .octrow span{text-align:center; font-size:.72rem; padding:2px 0; border-radius:3px; color:var(--lcd-dim); box-shadow:inset 0 0 0 1px var(--lcd-dim)}
 .octrow span.on{background:var(--lcd-ink); color:var(--lcd); box-shadow:none}
-.lcdhint{font-size:.68rem; color:var(--lcd-dim); text-align:right; margin-top:5px}
+.lcdhint{display:flex; justify-content:space-between; gap:8px; font-size:.68rem; color:var(--lcd-dim); margin-top:5px}
+.lcdhint #prog{color:var(--lcd-ink)}
+.gear{
+  position:absolute; top:6px; right:6px; width:36px; height:36px; display:grid; place-items:center;
+  border:0; border-radius:6px; background:transparent; color:var(--lcd-ink); cursor:pointer; padding:0;
+  -webkit-tap-highlight-color:transparent; touch-action:manipulation;
+}
+.gear:hover{background:color-mix(in srgb,var(--lcd-ink) 10%,transparent)}
+.gear:focus-visible{outline:2px solid var(--lcd-ink); outline-offset:-2px}
+.gear svg{width:20px; height:20px}
+
+/* Settings sheet */
+dialog.sheet{
+  width:min(440px,calc(100vw - 32px)); max-height:calc(100dvh - 32px); overflow:auto;
+  margin:auto; padding:0; border:0; border-radius:14px;
+  background:var(--bg); color:var(--ink); box-shadow:0 18px 50px -10px var(--shadow-c), 0 0 0 1px var(--line);
+}
+dialog.sheet::backdrop{background:rgba(8,12,18,.45)}
+.sheet-h{display:flex; align-items:center; justify-content:space-between; padding:12px 12px 4px 16px}
+.sheet-h h2{margin:0; font-size:1rem; font-weight:600; letter-spacing:.06em}
+.sheet-b{display:flex; flex-direction:column; gap:12px; padding:8px 16px 16px}
+.xbtn{font:inherit; font-size:1.3rem; line-height:1; width:36px; height:36px; border:0; border-radius:8px; background:transparent; color:var(--muted); cursor:pointer}
+.xbtn:hover{background:var(--panel)}
 
 /* Settings */
 .ctrl{display:flex; flex-direction:column; gap:8px}
@@ -136,33 +155,19 @@ input[type="checkbox"]{accent-color:var(--accent); width:18px; height:18px; marg
 .app[data-voice="dtmf"] .octbar,.app[data-voice="dtmf"] .octrow{opacity:.4}
 
 .extras{display:flex; flex-direction:column; gap:10px; padding:10px 12px; background:var(--panel); border-radius:10px; box-shadow:inset 0 0 0 1px var(--line)}
+.app{min-height:calc(100dvh - 36px); justify-content:center}
 </style>
 
 <div class="app" id="app" data-voice="piano">
-  <header><h1>拨号琴</h1><span>电话键盘钢琴 · 原型</span></header>
-
   <div class="lcd" id="lcd">
+    <button type="button" class="gear" id="setBtn" aria-label="设置" aria-haspopup="dialog">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+    </button>
     <div class="dial" id="dial">&nbsp;</div>
     <div class="note dim" id="note">点任意键开始</div>
     <div class="octrow" id="octrow"></div>
-    <div class="lcdhint">↕ 在显示屏上划动切换基准八度</div>
+    <div class="lcdhint"><span id="prog"></span><span>↕ 划动切换基准八度</span></div>
   </div>
-
-  <section class="ctrl" aria-label="音色与键位">
-    <div class="row">
-      <span class="lbl">音色</span>
-      <button type="button" class="chip" data-voice="piano" aria-pressed="true">钢琴</button>
-      <button type="button" class="chip" data-voice="organ" aria-pressed="false">电子琴</button>
-      <button type="button" class="chip" data-voice="chip" aria-pressed="false">8-bit</button>
-      <button type="button" class="chip" data-voice="dtmf" aria-pressed="false">拨号音</button>
-    </div>
-    <div class="row">
-      <span class="lbl">键位</span>
-      <button type="button" class="chip" data-mode="orig" aria-pressed="true">原始映射</button>
-      <button type="button" class="chip" data-mode="sharp" aria-pressed="false">升号键</button>
-    </div>
-    <p class="hint" id="hint"></p>
-  </section>
 
   <div class="pad" id="pad" role="group" aria-label="电话键盘"></div>
 
@@ -172,25 +177,44 @@ input[type="checkbox"]{accent-color:var(--accent); width:18px; height:18px; marg
     <button type="button" class="octbtn" id="octUp" aria-pressed="false"><span>▲ 高八度</span><small>按住生效</small></button>
   </div>
 
-  <section class="extras" aria-label="更多">
-    <div class="row">
-      <label class="sw"><input type="checkbox" id="shakeOn"> 甩动换八度</label>
-      <span class="status" id="shakeSt">向上甩升基准八度，向下甩降基准八度</span>
+  <dialog class="sheet" id="settings" aria-labelledby="setTitle">
+    <div class="sheet-h"><h2 id="setTitle">设置</h2><button type="button" class="xbtn" id="setClose" aria-label="关闭">✕</button></div>
+    <div class="sheet-b">
+    <section class="ctrl" aria-label="音色与键位">
+      <div class="row">
+        <span class="lbl">音色</span>
+        <button type="button" class="chip" data-voice="piano" aria-pressed="true">钢琴</button>
+        <button type="button" class="chip" data-voice="organ" aria-pressed="false">电子琴</button>
+        <button type="button" class="chip" data-voice="chip" aria-pressed="false">8-bit</button>
+        <button type="button" class="chip" data-voice="dtmf" aria-pressed="false">拨号音</button>
+      </div>
+      <div class="row">
+        <span class="lbl">键位</span>
+        <button type="button" class="chip" data-mode="orig" aria-pressed="true">原始映射</button>
+        <button type="button" class="chip" data-mode="sharp" aria-pressed="false">升号键</button>
+      </div>
+      <p class="hint" id="hint"></p>
+    </section>
+    <section class="extras" aria-label="更多">
+      <div class="row">
+        <label class="sw"><input type="checkbox" id="shakeOn"> 甩动换八度</label>
+        <span class="status" id="shakeSt">向上甩升基准八度，向下甩降基准八度</span>
+      </div>
+      <div class="row" id="sensRow" hidden>
+        <label class="lbl" for="sens">灵敏度</label>
+        <input type="range" id="sens" min="10" max="30" value="22">
+      </div>
+      <div class="row">
+        <label class="lbl" for="song">跟弹</label>
+        <select id="song">
+          <option value="">关闭</option>
+          <option value="twinkle">小星星</option>
+          <option value="ode">欢乐颂</option>
+        </select>
+      </div>
+    </section>
     </div>
-    <div class="row" id="sensRow" hidden>
-      <label class="lbl" for="sens">灵敏度</label>
-      <input type="range" id="sens" min="10" max="30" value="22">
-    </div>
-    <div class="row">
-      <label class="lbl" for="song">跟弹</label>
-      <select id="song">
-        <option value="">关闭</option>
-        <option value="twinkle">小星星</option>
-        <option value="ode">欢乐颂</option>
-      </select>
-      <span class="status" id="prog"></span>
-    </div>
-  </section>
+  </dialog>
 </div>
 
 <script>
@@ -435,6 +459,7 @@ input[type="checkbox"]{accent-color:var(--accent); width:18px; height:18px; marg
 
   document.addEventListener('keydown',function(e){
     if(e.repeat||e.metaKey||e.ctrlKey||e.altKey)return;
+    if(dlg.open)return;
     var t=e.target; if(t&&/^(SELECT|INPUT|TEXTAREA)$/.test(t.tagName))return;
     if(KEYS.indexOf(e.key)>=0){e.preventDefault();press(e.key,'k'+e.key)}
     else if(e.key==='ArrowUp'){e.preventDefault();holdOct('up','kU',true)}
@@ -480,7 +505,7 @@ input[type="checkbox"]{accent-color:var(--accent); width:18px; height:18px; marg
   });
 
   var sw=null;
-  lcd.addEventListener('pointerdown',function(e){sw={x:e.clientX,y:e.clientY};try{lcd.setPointerCapture(e.pointerId)}catch(err){}});
+  lcd.addEventListener('pointerdown',function(e){if(e.target.closest('.gear'))return;sw={x:e.clientX,y:e.clientY};try{lcd.setPointerCapture(e.pointerId)}catch(err){}});
   lcd.addEventListener('pointerup',function(e){
     if(!sw)return;
     var dx=e.clientX-sw.x,dy=e.clientY-sw.y; sw=null;
@@ -548,6 +573,12 @@ input[type="checkbox"]{accent-color:var(--accent); width:18px; height:18px; marg
     c.addEventListener('click',function(){state.mode=c.dataset.mode;save('mode',state.mode);syncChips();refreshLabels()});
   });
   $('#song').addEventListener('change',function(e){state.song=e.target.value;state.idx=0;refreshFollow()});
+
+  /* ---------- settings sheet ---------- */
+  var dlg=$('#settings');
+  $('#setBtn').addEventListener('click',function(){releaseAll();if(dlg.showModal)dlg.showModal();else dlg.setAttribute('open','')});
+  $('#setClose').addEventListener('click',function(){dlg.close?dlg.close():dlg.removeAttribute('open')});
+  dlg.addEventListener('click',function(e){if(e.target===dlg)dlg.close()});
 
   syncChips(); refreshLabels(); refreshOct(); refreshFollow();
 })();
