@@ -117,11 +117,20 @@ input[type="checkbox"]{accent-color:var(--accent); width:18px; height:18px; marg
 /* Octave bar */
 .octbar{display:grid; grid-template-columns:1fr auto 1fr; gap:10px; align-items:center}
 .octbtn{
-  font:inherit; font-size:.95rem; font-weight:600; min-height:52px; border:0; border-radius:10px;
-  background:var(--panel); color:var(--ink); cursor:pointer; touch-action:manipulation;
-  box-shadow:inset 0 0 0 1px var(--line), 0 2px 0 var(--line); -webkit-tap-highlight-color:transparent;
+  font:inherit; font-size:.95rem; font-weight:600; min-height:60px; border:0; border-radius:10px;
+  display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px;
+  background:var(--mod); color:var(--mod-ink); cursor:pointer; touch-action:none;
+  user-select:none; -webkit-user-select:none; -webkit-touch-callout:none;
+  box-shadow:0 3px 0 var(--mod-edge), inset 0 0 0 1px var(--line); -webkit-tap-highlight-color:transparent;
 }
-.octbtn:active{background:var(--accent); color:var(--accent-ink)}
+.octbtn small{font-size:.7rem; font-weight:500; letter-spacing:.06em; opacity:.75}
+.octbtn.held{
+  background:var(--accent); color:var(--accent-ink); transform:translateY(3px);
+  box-shadow:0 0 0 var(--accent-edge), inset 0 0 0 1px var(--accent-edge);
+}
+.octbtn.held small{opacity:1}
+.octmid.shifted b{color:var(--accent)}
+.octrow span.base:not(.on){box-shadow:inset 0 0 0 2px var(--lcd-ink); color:var(--lcd-ink)}
 .octmid{text-align:center; font-family:var(--f-lcd); font-size:.78rem; color:var(--muted); line-height:1.35; min-width:6em}
 .octmid b{display:block; font-size:1.3rem; color:var(--ink); font-weight:500}
 .app[data-voice="dtmf"] .octbar,.app[data-voice="dtmf"] .octrow{opacity:.4}
@@ -136,7 +145,7 @@ input[type="checkbox"]{accent-color:var(--accent); width:18px; height:18px; marg
     <div class="dial" id="dial">&nbsp;</div>
     <div class="note dim" id="note">点任意键开始</div>
     <div class="octrow" id="octrow"></div>
-    <div class="lcdhint">↕ 在显示屏上划动换八度</div>
+    <div class="lcdhint">↕ 在显示屏上划动切换基准八度</div>
   </div>
 
   <section class="ctrl" aria-label="音色与键位">
@@ -158,15 +167,15 @@ input[type="checkbox"]{accent-color:var(--accent); width:18px; height:18px; marg
   <div class="pad" id="pad" role="group" aria-label="电话键盘"></div>
 
   <div class="octbar">
-    <button type="button" class="octbtn" id="octDn">▼ 低八度</button>
+    <button type="button" class="octbtn" id="octDn" aria-pressed="false"><span>▼ 低八度</span><small>按住生效</small></button>
     <div class="octmid" id="octmid"><b>C4</b><span>1 = 261.6 Hz</span></div>
-    <button type="button" class="octbtn" id="octUp">▲ 高八度</button>
+    <button type="button" class="octbtn" id="octUp" aria-pressed="false"><span>▲ 高八度</span><small>按住生效</small></button>
   </div>
 
   <section class="extras" aria-label="更多">
     <div class="row">
       <label class="sw"><input type="checkbox" id="shakeOn"> 甩动换八度</label>
-      <span class="status" id="shakeSt">向上甩升八度，向下甩降八度</span>
+      <span class="status" id="shakeSt">向上甩升基准八度，向下甩降基准八度</span>
     </div>
     <div class="row" id="sensRow" hidden>
       <label class="lbl" for="sens">灵敏度</label>
@@ -210,6 +219,8 @@ input[type="checkbox"]{accent-color:var(--accent); width:18px; height:18px; marg
   function save(k,v){try{localStorage.setItem('dialpiano.'+k,v)}catch(e){}}
 
   var state={mode:load('mode','orig'),voice:load('voice','piano'),oct:4,sharp:0,flat:0,dial:'',last:'',song:'',idx:0};
+  // state.oct is the base octave (swipe / shake); the ▲▼ buttons only shift it while held
+  var octHold={up:new Set(),dn:new Set()};
   if(state.mode!=='orig'&&state.mode!=='sharp')state.mode='orig';
   if(['piano','organ','chip','dtmf'].indexOf(state.voice)<0)state.voice='piano';
 
@@ -311,10 +322,23 @@ input[type="checkbox"]{accent-color:var(--accent); width:18px; height:18px; marg
     elHint.textContent=dtmf?HINTS.dtmf:HINTS[state.mode];
   }
 
+  function curOct(){
+    var d=(octHold.up.size?1:0)-(octHold.dn.size?1:0);
+    return Math.max(2,Math.min(6,state.oct+d));
+  }
   function refreshOct(){
-    Array.prototype.forEach.call(elOct.children,function(s){s.classList.toggle('on',+s.dataset.o===state.oct)});
-    var f=mtof((state.oct+1)*12);
-    elMid.innerHTML='<b>C'+state.oct+'</b><span>'+(state.voice==='dtmf'?'无音高':'1 = '+f.toFixed(1)+' Hz')+'</span>';
+    var o=curOct(),shifted=o!==state.oct;
+    Array.prototype.forEach.call(elOct.children,function(s){
+      s.classList.toggle('on',+s.dataset.o===o);
+      s.classList.toggle('base',shifted&&+s.dataset.o===state.oct);
+    });
+    var f=mtof((o+1)*12);
+    elMid.classList.toggle('shifted',shifted);
+    elMid.innerHTML='<b>C'+o+'</b><span>'+(state.voice==='dtmf'?'无音高':(shifted?'临时 · ':'')+'1 = '+f.toFixed(1)+' Hz')+'</span>';
+    [['up','#octUp'],['dn','#octDn']].forEach(function(p){
+      var b=$(p[1]),h=octHold[p[0]].size>0;
+      b.classList.toggle('held',h); b.setAttribute('aria-pressed',String(h));
+    });
   }
   function setOct(o){
     o=Math.max(2,Math.min(6,o));
@@ -371,7 +395,7 @@ input[type="checkbox"]{accent-color:var(--accent); width:18px; height:18px; marg
     if(ctx&&master){
       if(dtmf){entry.voice=startVoice('dtmf',DTMF[k]);entry.nm=DTMF[k][0]+'+'+DTMF[k][1]}
       else{
-        var midi=(state.oct+1)*12+semi(k);
+        var midi=(curOct()+1)*12+semi(k);
         entry.voice=startVoice(state.voice,midi);
         entry.nm=nameMidi(midi);
       }
@@ -392,7 +416,10 @@ input[type="checkbox"]{accent-color:var(--accent); width:18px; height:18px; marg
     }else if(en.voice){stopVoice(en.voice)}
     render();
   }
-  function releaseAll(){Array.from(active.keys()).forEach(releaseId)}
+  function releaseAll(){
+    Array.from(active.keys()).forEach(releaseId);
+    octHold.up.clear(); octHold.dn.clear(); refreshOct();
+  }
 
   pad.addEventListener('pointerdown',function(e){
     if(e.button>0)return;
@@ -410,10 +437,12 @@ input[type="checkbox"]{accent-color:var(--accent); width:18px; height:18px; marg
     if(e.repeat||e.metaKey||e.ctrlKey||e.altKey)return;
     var t=e.target; if(t&&/^(SELECT|INPUT|TEXTAREA)$/.test(t.tagName))return;
     if(KEYS.indexOf(e.key)>=0){e.preventDefault();press(e.key,'k'+e.key)}
-    else if(e.key==='ArrowUp'){e.preventDefault();setOct(state.oct+1)}
-    else if(e.key==='ArrowDown'){e.preventDefault();setOct(state.oct-1)}
+    else if(e.key==='ArrowUp'){e.preventDefault();holdOct('up','kU',true)}
+    else if(e.key==='ArrowDown'){e.preventDefault();holdOct('dn','kD',true)}
   });
   document.addEventListener('keyup',function(e){
+    if(e.key==='ArrowUp'){holdOct('up','kU',false);return}
+    if(e.key==='ArrowDown'){holdOct('dn','kD',false);return}
     if(e.key==='Shift'){releaseId('k*');releaseId('k#')}
     else if(e.key==='8')releaseId('k*');
     else if(e.key==='3')releaseId('k#');
@@ -423,8 +452,32 @@ input[type="checkbox"]{accent-color:var(--accent); width:18px; height:18px; marg
   document.addEventListener('visibilitychange',function(){if(document.hidden)releaseAll()});
 
   /* ---------- octave controls ---------- */
-  $('#octUp').addEventListener('click',function(){setOct(state.oct+1)});
-  $('#octDn').addEventListener('click',function(){setOct(state.oct-1)});
+  // momentary: the shift applies only while the button is held, then falls back to the base octave
+  function holdOct(dir,id,on){
+    var s=octHold[dir];
+    if(on){if(s.has(id))return;s.add(id)}else{if(!s.delete(id))return}
+    refreshOct();
+  }
+  [['up','#octUp'],['dn','#octDn']].forEach(function(p){
+    var b=$(p[1]),dir=p[0];
+    b.addEventListener('pointerdown',function(e){
+      if(e.button>0)return;
+      e.preventDefault(); ensureAudio();
+      holdOct(dir,'p'+e.pointerId,true);
+      try{b.setPointerCapture(e.pointerId)}catch(err){}
+    });
+    ['pointerup','pointercancel','lostpointercapture'].forEach(function(ev){
+      b.addEventListener(ev,function(e){holdOct(dir,'p'+e.pointerId,false)});
+    });
+    b.addEventListener('contextmenu',function(e){e.preventDefault()});
+    b.addEventListener('keydown',function(e){
+      if((e.key===' '||e.key==='Enter')&&!e.repeat){e.preventDefault();e.stopPropagation();holdOct(dir,'b',true)}
+    });
+    b.addEventListener('keyup',function(e){
+      if(e.key===' '||e.key==='Enter'){e.preventDefault();holdOct(dir,'b',false)}
+    });
+    b.addEventListener('blur',function(){holdOct(dir,'b',false)});
+  });
 
   var sw=null;
   lcd.addEventListener('pointerdown',function(e){sw={x:e.clientX,y:e.clientY};try{lcd.setPointerCapture(e.pointerId)}catch(err){}});
@@ -438,7 +491,7 @@ input[type="checkbox"]{accent-color:var(--accent); width:18px; height:18px; marg
   /* ---------- shake (device motion) ---------- */
   var shake={on:false,got:false,init:false,g:[0,0,0],last:0,warm:0,thr:14};
   var chk=$('#shakeOn'),sens=$('#sens'),sensRow=$('#sensRow');
-  var IDLE='向上甩升八度，向下甩降八度';
+  var IDLE='向上甩升基准八度，向下甩降基准八度';
   function onMotion(e){
     var ag=e.accelerationIncludingGravity;
     if(!ag||ag.x==null)return;
