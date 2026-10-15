@@ -1,5 +1,5 @@
 <!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
-<title>拨号琴</title>
+<title>Dial Piano</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Instrument+Sans:wght@500;600&display=swap">
 <style>
@@ -169,58 +169,58 @@ input[type="checkbox"]{accent-color:var(--accent); width:18px; height:18px; marg
 
 <div class="app" id="app" data-voice="piano">
   <div class="lcd" id="lcd">
-    <button type="button" class="gear" id="setBtn" aria-label="设置" aria-haspopup="dialog">
+    <button type="button" class="gear" id="setBtn" aria-label="Settings" aria-haspopup="dialog">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
     </button>
     <div class="dial" id="dial">&nbsp;</div>
-    <div class="note dim" id="note">点任意键开始</div>
+    <div class="note dim" id="note">Tap any key</div>
     <div class="lcdhint"><span id="prog"></span></div>
   </div>
 
-  <div class="pad" id="pad" role="group" aria-label="电话键盘"></div>
+  <div class="pad" id="pad" role="group" aria-label="Phone keypad"></div>
 
   <div class="octbar">
-    <button type="button" class="octbtn" id="octDn" aria-pressed="false"><span>▼ 低八度</span><small>按住生效</small></button>
-    <div class="octsel" id="octsel" role="slider" tabindex="0" aria-label="基准八度" aria-valuemin="2" aria-valuemax="6" aria-valuenow="4">
+    <button type="button" class="octbtn" id="octDn" aria-pressed="false"><span>▼ 8vb</span><small>HOLD</small></button>
+    <div class="octsel" id="octsel" role="slider" tabindex="0" aria-label="Base octave" aria-valuemin="2" aria-valuemax="6" aria-valuenow="4">
       <div class="octcur" id="octcur"><b>C4</b>261.6 Hz</div>
       <div class="octrow" id="octrow"></div>
     </div>
-    <button type="button" class="octbtn" id="octUp" aria-pressed="false"><span>▲ 高八度</span><small>按住生效</small></button>
+    <button type="button" class="octbtn" id="octUp" aria-pressed="false"><span>▲ 8va</span><small>HOLD</small></button>
   </div>
 
   <dialog class="sheet" id="settings" aria-labelledby="setTitle">
-    <div class="sheet-h"><h2 id="setTitle">设置</h2><button type="button" class="xbtn" id="setClose" aria-label="关闭">✕</button></div>
+    <div class="sheet-h"><h2 id="setTitle">Settings</h2><button type="button" class="xbtn" id="setClose" aria-label="Close">✕</button></div>
     <div class="sheet-b">
-    <section class="ctrl" aria-label="音色与键位">
+    <section class="ctrl" aria-label="Sound and layout">
       <div class="row">
-        <span class="lbl">音色</span>
-        <button type="button" class="chip" data-voice="piano" aria-pressed="true">钢琴</button>
-        <button type="button" class="chip" data-voice="organ" aria-pressed="false">电子琴</button>
+        <span class="lbl">Sound</span>
+        <button type="button" class="chip" data-voice="piano" aria-pressed="true">Piano</button>
+        <button type="button" class="chip" data-voice="organ" aria-pressed="false">Organ</button>
         <button type="button" class="chip" data-voice="chip" aria-pressed="false">8-bit</button>
-        <button type="button" class="chip" data-voice="dtmf" aria-pressed="false">拨号音</button>
+        <button type="button" class="chip" data-voice="dtmf" aria-pressed="false">DTMF</button>
       </div>
       <div class="row">
-        <span class="lbl">键位</span>
-        <button type="button" class="chip" data-mode="orig" aria-pressed="true">原始映射</button>
-        <button type="button" class="chip" data-mode="sharp" aria-pressed="false">升号键</button>
+        <span class="lbl">Keys</span>
+        <button type="button" class="chip" data-mode="orig" aria-pressed="true">Chromatic</button>
+        <button type="button" class="chip" data-mode="sharp" aria-pressed="false">♯/♭ hold</button>
       </div>
       <p class="hint" id="hint"></p>
     </section>
-    <section class="extras" aria-label="更多">
+    <section class="extras" aria-label="More">
       <div class="row">
-        <label class="sw"><input type="checkbox" id="shakeOn"> 甩动换八度</label>
-        <span class="status" id="shakeSt">向上甩升基准八度，向下甩降基准八度</span>
+        <label class="sw"><input type="checkbox" id="shakeOn"> Shake to change octave</label>
+        <span class="status" id="shakeSt">Flick phone ↑ or ↓</span>
       </div>
       <div class="row" id="sensRow" hidden>
-        <label class="lbl" for="sens">灵敏度</label>
+        <label class="lbl" for="sens">Sensitivity</label>
         <input type="range" id="sens" min="10" max="30" value="22">
       </div>
       <div class="row">
-        <label class="lbl" for="song">跟弹</label>
+        <label class="lbl" for="song">Play along</label>
         <select id="song">
-          <option value="">关闭</option>
-          <option value="twinkle">小星星</option>
-          <option value="ode">欢乐颂</option>
+          <option value="">Off</option>
+          <option value="twinkle">Twinkle Twinkle</option>
+          <option value="ode">Ode to Joy</option>
         </select>
       </div>
     </section>
@@ -245,9 +245,9 @@ input[type="checkbox"]{accent-color:var(--accent); width:18px; height:18px; marg
     ode:['3','3','4','5','5','4','3','2','1','1','2','3','3','2','2']
   };
   var HINTS={
-    orig:'1–7 是简谱 do–si（浅色键），8 9 0 * # 依次是 C♯ D♯ F♯ G♯ A♯（深色键）。',
-    sharp:'1–7 是简谱；按住 * 升半音，按住 # 降半音；8 9 0 是高音 1 2 3。',
-    dtmf:'拨号音模式：每个键发出真实电话的双音（DTMF），没有音高，字母和真手机一样。'
+    orig:'1–7 = do–si (light keys). 8 9 0 * # = C♯ D♯ F♯ G♯ A♯ (dark keys).',
+    sharp:'1–7 = do–si. Hold * for ♯, hold # for ♭. 8 9 0 = high do re mi.',
+    dtmf:'Real phone dial tones (DTMF): two tones per key, no musical pitch.'
   };
 
   function load(k,d){try{var v=localStorage.getItem('dialpiano.'+k);return v==null?d:v}catch(e){return d}}
@@ -347,8 +347,8 @@ input[type="checkbox"]{accent-color:var(--accent); width:18px; height:18px; marg
       var el=keyEl[k],cls,sub;
       if(dtmf){cls='nat';sub=LETTERS[k]}
       else if(state.mode==='orig'){cls='1234567'.indexOf(k)>=0?'nat':'shp';sub=NAMES[ORIG[k]]}
-      else if(k==='*'){cls='mod';sub='♯ 按住'}
-      else if(k==='#'){cls='mod';sub='♭ 按住'}
+      else if(k==='*'){cls='mod';sub='♯ hold'}
+      else if(k==='#'){cls='mod';sub='♭ hold'}
       else{var hiKey=(k==='8'||k==='9'||k==='0');cls=hiKey?'hi':'nat';sub=nameSemi(semi(k))+(hiKey?'↑':'')}
       el.classList.remove('nat','shp','hi','mod'); el.classList.add(cls);
       subEl[k].textContent=sub;
@@ -371,7 +371,7 @@ input[type="checkbox"]{accent-color:var(--accent); width:18px; height:18px; marg
     elSel.classList.toggle('shifted',shifted);
     elSel.setAttribute('aria-valuenow',String(state.oct));
     elSel.setAttribute('aria-valuetext','C'+state.oct);
-    elCur.innerHTML='<b>C'+o+'</b>'+(state.voice==='dtmf'?'无音高':(shifted?'临时':f.toFixed(1)+' Hz'));
+    elCur.innerHTML='<b>C'+o+'</b>'+(state.voice==='dtmf'?'no pitch':(shifted?'hold':f.toFixed(1)+' Hz'));
     [['up','#octUp'],['dn','#octDn']].forEach(function(p){
       var b=$(p[1]),h=octHold[p[0]].size>0;
       b.classList.toggle('held',h); b.setAttribute('aria-pressed',String(h));
@@ -404,13 +404,13 @@ input[type="checkbox"]{accent-color:var(--accent); width:18px; height:18px; marg
     if(!s){elProg.textContent='';return}
     var k=s[state.idx];
     keyEl[k].classList.add('target');
-    elProg.textContent='下一个：'+k+'（'+(state.idx+1)+'/'+s.length+'）';
+    elProg.textContent='▶ '+k+'  '+(state.idx+1)+'/'+s.length;
   }
   function followCheck(k){
     var s=SONGS[state.song]; if(!s)return;
     if(k===s[state.idx]){
       state.idx++;
-      if(state.idx>=s.length){state.idx=0;refreshFollow();elProg.textContent='弹完了，再来一遍';return}
+      if(state.idx>=s.length){state.idx=0;refreshFollow();elProg.textContent='✓ Done — again!';return}
       refreshFollow();
     }
   }
@@ -541,13 +541,13 @@ input[type="checkbox"]{accent-color:var(--accent); width:18px; height:18px; marg
   /* ---------- shake (device motion) ---------- */
   var shake={on:false,got:false,init:false,g:[0,0,0],last:0,warm:0,thr:14};
   var chk=$('#shakeOn'),sens=$('#sens'),sensRow=$('#sensRow');
-  var IDLE='向上甩升基准八度，向下甩降基准八度';
+  var IDLE='Flick phone ↑ or ↓';
   function onMotion(e){
     var ag=e.accelerationIncludingGravity;
     if(!ag||ag.x==null)return;
     shake.got=true;
     var now=performance.now();
-    if(!shake.init){shake.g=[ag.x,ag.y,ag.z];shake.init=true;shake.warm=now+500;elShakeSt.textContent='已就绪：'+IDLE;return}
+    if(!shake.init){shake.g=[ag.x,ag.y,ag.z];shake.init=true;shake.warm=now+500;elShakeSt.textContent='Ready · '+IDLE;return}
     var g=shake.g;
     g[0]=g[0]*0.96+ag.x*0.04; g[1]=g[1]*0.96+ag.y*0.04; g[2]=g[2]*0.96+ag.z*0.04;
     if(now<shake.warm||now-shake.last<700)return;
@@ -573,15 +573,15 @@ input[type="checkbox"]{accent-color:var(--accent); width:18px; height:18px; marg
       }
     }catch(err){p=Promise.reject(err)}
     p.then(function(r){
-      if(r!=='granted'){chk.checked=false;elShakeSt.textContent='没有拿到传感器权限';return}
+      if(r!=='granted'){chk.checked=false;elShakeSt.textContent='Motion permission denied';return}
       window.addEventListener('devicemotion',onMotion);
       shake.on=true;shake.got=false;shake.init=false;sensRow.hidden=false;
-      elShakeSt.textContent='等待传感器…';
+      elShakeSt.textContent='Waiting for sensor…';
       setTimeout(function(){
-        if(shake.on&&!shake.got)elShakeSt.textContent='这里读不到手机传感器。请用两个八度按钮中间的 C2–C6 选择。';
+        if(shake.on&&!shake.got)elShakeSt.textContent='No motion sensor here. Use the octave selector instead.';
       },2500);
     }).catch(function(){
-      chk.checked=false;elShakeSt.textContent='这里读不到手机传感器。请用两个八度按钮中间的 C2–C6 选择。';
+      chk.checked=false;elShakeSt.textContent='No motion sensor here. Use the octave selector instead.';
     });
   });
 
