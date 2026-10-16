@@ -5,7 +5,7 @@
 <style>
 /* Layout: one narrow phone-shaped column. Screen on top (with a live waveform), the keypad is the instrument, the octave bar sits under the thumb.
    Colour logic: every note owns a hue (--h, one step of the colour wheel per semitone); a pressed key lights up in its hue
-   and the screen + background aura follow the last note (--lh). Dark keys = sharps, cyan-tinted = high notes, faint = held modifiers. */
+   and the screen + background aura follow the last note (--lh). Dark keys = sharps / low notes, cyan-tinted = high notes. */
 @property --lh{syntax:'<number>';inherits:true;initial-value:260}
 :root{
   --f-ui:"Sora","PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans CJK SC",system-ui,sans-serif;
@@ -189,10 +189,8 @@ input[type="checkbox"]{accent-color:var(--accent); width:18px; height:18px; marg
 .key .d{font-size:1.9rem; font-weight:700; line-height:1}
 .key .s{font-family:var(--f-lcd); font-size:.7rem; letter-spacing:.06em; min-height:1.1em; opacity:.75}
 .key.nat{--kb:var(--nat); --ki:var(--nat-ink)}
-.key.shp{--kb:var(--shp); --ki:var(--shp-ink)}
+.key.shp,.key.lo{--kb:var(--shp); --ki:var(--shp-ink)}
 .key.hi{--kb:var(--hi); --ki:var(--hi-ink)}
-.key.mod{--kb:var(--mod); --ki:var(--mod-ink); box-shadow:inset 0 0 0 1px var(--line), 0 0 0 0 transparent}
-.key.mod::after{display:none}
 .key:hover::after{left:26%; right:26%; opacity:1}
 .key.down{
   background:linear-gradient(140deg,hsl(var(--h) 95% 62%),hsl(calc(var(--h) + 45) 95% 56%));
@@ -202,7 +200,6 @@ input[type="checkbox"]{accent-color:var(--accent); width:18px; height:18px; marg
 }
 .key.down::after{opacity:0}
 .key.down .s{opacity:1}
-.key.mod.down{background:linear-gradient(140deg,var(--accent),var(--accent-2))}
 .key.target{box-shadow:inset 0 0 0 2px hsl(var(--h) 95% var(--glow-l)), 0 0 22px -4px hsl(var(--h) 95% 60%)}
 .key:focus-visible,.chip:focus-visible,.octbtn:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
 @media (prefers-reduced-motion:no-preference){
@@ -320,7 +317,8 @@ input[type="checkbox"]{accent-color:var(--accent); width:18px; height:18px; marg
       <div class="row">
         <span class="lbl">Keys</span>
         <button type="button" class="chip" data-mode="orig" aria-pressed="true">Chromatic</button>
-        <button type="button" class="chip" data-mode="sharp" aria-pressed="false">♯/♭ hold</button>
+        <button type="button" class="chip" data-mode="diatonic" aria-pressed="false">Do-Re-Mi</button>
+        <button type="button" class="chip" data-mode="numpad" aria-pressed="false">Numpad</button>
         <button type="button" class="chip" data-mode="custom" aria-pressed="false">Custom</button>
       </div>
       <p class="hint" id="hint"></p>
@@ -355,11 +353,13 @@ input[type="checkbox"]{accent-color:var(--accent); width:18px; height:18px; marg
 (function(){
   var KEYS=['1','2','3','4','5','6','7','8','9','*','0','#'];
   var NAMES=['C','C♯','D','D♯','E','F','F♯','G','G♯','A','A♯','B'];
-  var FLATS=['C','D♭','D','E♭','E','F','G♭','G','A♭','A','B♭','B'];
   // original mapping: semitones above C for each key
   var ORIG={'1':0,'2':2,'3':4,'4':5,'5':7,'6':9,'7':11,'8':1,'9':3,'0':6,'*':8,'#':10};
-  // sharp-key mapping: 1-7 natural, 8/9/0 = high 1/2/3 (next octave); * and # are held modifiers
-  var NAT={'1':0,'2':2,'3':4,'4':5,'5':7,'6':9,'7':11,'8':12,'9':14,'0':16};
+  // do-re-mi mapping: 1-7 natural, 8 9 * 0 # = high C D E F G (next octave)
+  var DIA={'1':0,'2':2,'3':4,'4':5,'5':7,'6':9,'7':11,'8':12,'9':14,'*':16,'0':17,'#':19};
+  // numpad mapping (7 8 9 on top): pitch rises left→right and bottom→top, so top to bottom 9 8 7 6 5 4 3 2 1 0 # * = D+ C+ B A G F E D C B- A- G-
+  var NUMPAD={'1':0,'2':2,'3':4,'4':5,'5':7,'6':9,'7':11,'8':12,'9':14,'0':-1,'#':-3,'*':-5};
+  var PAD_ORDER={phone:KEYS,numpad:['7','8','9','4','5','6','1','2','3','*','#','0']};
   var DTMF={'1':[697,1209],'2':[697,1336],'3':[697,1477],'4':[770,1209],'5':[770,1336],'6':[770,1477],
             '7':[852,1209],'8':[852,1336],'9':[852,1477],'*':[941,1209],'0':[941,1336],'#':[941,1477]};
   var LETTERS={'1':'','2':'ABC','3':'DEF','4':'GHI','5':'JKL','6':'MNO','7':'PQRS','8':'TUV','9':'WXYZ','*':'','0':'','#':''};
@@ -369,7 +369,8 @@ input[type="checkbox"]{accent-color:var(--accent); width:18px; height:18px; marg
   };
   var HINTS={
     orig:'1–7 = do–si (light keys). 8 9 0 * # = C♯ D♯ F♯ G♯ A♯ (dark keys).',
-    sharp:'1–7 = do–si. Hold * for ♯, hold # for ♭. 8 9 0 = high do re mi.',
+    diatonic:'1–7 = do–si. 8 9 * 0 # = high do re mi fa sol (next octave).',
+    numpad:'Numpad layout: 1–7 = do–si, 8 9 = high do re, 0 # * = low si la sol.',
     custom:'Pick a note for every key. ↑ / ↓ = one octave above / below the base octave.',
     dtmf:'Real phone dial tones (DTMF): two tones per key, no musical pitch.'
   };
@@ -393,10 +394,11 @@ input[type="checkbox"]{accent-color:var(--accent); width:18px; height:18px; marg
     c.addEventListener('click',function(){theme=c.dataset.theme;save('theme',theme);applyTheme()});
   });
   applyTheme();
-  var state={mode:load('mode','orig'),voice:load('voice','piano'),oct:4,sharp:0,flat:0,dial:'',last:'',song:'',idx:0};
+  var state={mode:load('mode','orig'),voice:load('voice','piano'),oct:4,dial:'',last:'',song:'',idx:0};
   // state.oct is the base octave (swipe / shake); the ▲▼ buttons only shift it while held
   var octHold={up:new Set(),dn:new Set()};
-  if(['orig','sharp','custom'].indexOf(state.mode)<0)state.mode='orig';
+  if(state.mode==='sharp')state.mode='diatonic';
+  if(['orig','diatonic','numpad','custom'].indexOf(state.mode)<0)state.mode='orig';
   if(['piano','organ','chip','dtmf'].indexOf(state.voice)<0)state.voice='piano';
 
   var $=function(s){return document.querySelector(s)};
@@ -466,15 +468,15 @@ input[type="checkbox"]{accent-color:var(--accent); width:18px; height:18px; marg
   function semi(k){
     if(state.mode==='orig')return ORIG[k];
     if(state.mode==='custom')return CUSTOM[k];
-    return NAT[k]+(state.sharp>0?1:0)-(state.flat>0?1:0);
+    if(state.mode==='numpad')return NUMPAD[k];
+    return DIA[k];
   }
-  function preferFlat(){return state.flat>0&&state.sharp===0}
-  function nameSemi(s){return (preferFlat()?FLATS:NAMES)[((s%12)+12)%12]}
+  function nameSemi(s){return NAMES[((s%12)+12)%12]}
   function octMark(s){var o=Math.floor(s/12);return o<0?'↓':(o>0?'↑':'')}
   function nameMidi(m){return nameSemi(m)+(Math.floor(m/12)-1)}
   // one step round the colour wheel per semitone, so the same pitch class always glows the same colour
   function hueOf(k){
-    var s=state.voice==='dtmf'?KEYS.indexOf(k)*7:(state.mode==='orig'?ORIG[k]:(state.mode==='custom'?CUSTOM[k]:(k in NAT?semi(k):0)));
+    var s=state.voice==='dtmf'?KEYS.indexOf(k)*7:semi(k);
     return (260+((s%12)+12)%12*30)%360;
   }
 
@@ -515,16 +517,14 @@ input[type="checkbox"]{accent-color:var(--accent); width:18px; height:18px; marg
     KEYS.forEach(function(k){
       var el=keyEl[k],cls,sub;
       if(dtmf){cls='nat';sub=LETTERS[k]}
-      else if(state.mode==='orig'){cls='1234567'.indexOf(k)>=0?'nat':'shp';sub=NAMES[ORIG[k]]}
-      else if(state.mode==='custom'){var cs=CUSTOM[k];cls=cs>=12?'hi':(NAMES[((cs%12)+12)%12].length>1?'shp':'nat');sub=NAMES[((cs%12)+12)%12]+octMark(cs)}
-      else if(k==='*'){cls='mod';sub='♯ hold'}
-      else if(k==='#'){cls='mod';sub='♭ hold'}
-      else{var hiKey=(k==='8'||k==='9'||k==='0');cls=hiKey?'hi':'nat';sub=nameSemi(semi(k))+(hiKey?'↑':'')}
-      el.classList.remove('nat','shp','hi','mod'); el.classList.add(cls);
+      else{var cs=semi(k);cls=nameSemi(cs).length>1?'shp':(cs>=12?'hi':(cs<0?'lo':'nat'));sub=nameSemi(cs)+octMark(cs)}
+      el.classList.remove('nat','shp','hi','lo'); el.classList.add(cls);
       el.style.setProperty('--h',hueOf(k));
       subEl[k].textContent=sub;
       el.setAttribute('aria-label',k+(sub?' '+sub:''));
     });
+    // numpad mode puts 7 8 9 on top; everything else keeps the phone order
+    PAD_ORDER[state.mode==='numpad'?'numpad':'phone'].forEach(function(k){pad.appendChild(keyEl[k])});
     elHint.textContent=dtmf?HINTS.dtmf:HINTS[state.mode];
     $('#customBox').hidden=state.mode!=='custom';
   }
@@ -579,7 +579,7 @@ input[type="checkbox"]{accent-color:var(--accent); width:18px; height:18px; marg
   function render(){
     elDial.textContent=state.dial.slice(-14)||' ';
     var names=[];
-    active.forEach(function(e){if(!e.mod)names.push(e.nm)});
+    active.forEach(function(e){names.push(e.nm)});
     if(names.length){elNote.textContent=names.join(' ');elNote.classList.remove('dim')}
     else if(state.last){elNote.textContent=state.last;elNote.classList.add('dim')}
     elNote.classList.toggle('many',names.length>3);
@@ -612,14 +612,8 @@ input[type="checkbox"]{accent-color:var(--accent); width:18px; height:18px; marg
     if(active.has(id))return;
     ensureAudio();
     var dtmf=state.voice==='dtmf';
-    var isMod=!dtmf&&state.mode==='sharp'&&(k==='*'||k==='#');
     setDown(k,1);
     state.dial+=k;
-    if(isMod){
-      if(k==='*')state.sharp++; else state.flat++;
-      active.set(id,{k:k,mod:true});
-      refreshLabels(); render(); sparkle(keyEl[k],260,'',pt); return;
-    }
     var entry={k:k};
     if(ctx&&master){
       if(dtmf){entry.voice=startVoice('dtmf',DTMF[k]);entry.nm=DTMF[k][0]+'+'+DTMF[k][1]}
@@ -641,10 +635,7 @@ input[type="checkbox"]{accent-color:var(--accent); width:18px; height:18px; marg
     var en=active.get(id); if(!en)return;
     active.delete(id);
     setDown(en.k,-1);
-    if(en.mod){
-      if(en.k==='*')state.sharp=Math.max(0,state.sharp-1); else state.flat=Math.max(0,state.flat-1);
-      refreshLabels();
-    }else if(en.voice){stopVoice(en.voice)}
+    if(en.voice)stopVoice(en.voice);
     render();
   }
   function releaseAll(){
