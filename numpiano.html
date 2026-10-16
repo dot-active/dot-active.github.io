@@ -427,16 +427,38 @@ input[type="checkbox"]{accent-color:var(--accent); width:18px; height:18px; marg
       elHint=$('#hint'),elSel=$('#octsel'),elCur=$('#octcur'),elProg=$('#prog'),elShakeSt=$('#shakeSt');
 
   /* ---------- audio ---------- */
-  var ctx=null,master=null,analyser=null,wave=null;
+  var ctx=null,master=null,analyser=null,wave=null,noiseBuf=null,pianoWave=null;
+  // master chain: voices → master → (dry + generated-hall reverb) → warm EQ → compressor → out
+  function makeIR(sec,decay){
+    var n=Math.floor(ctx.sampleRate*sec),ir=ctx.createBuffer(2,n,ctx.sampleRate);
+    for(var c=0;c<2;c++){var d=ir.getChannelData(c);for(var i=0;i<n;i++)d[i]=(Math.random()*2-1)*Math.pow(1-i/n,decay)}
+    return ir;
+  }
   function ensureAudio(){
     try{
       if(!ctx){
         var AC=window.AudioContext||window.webkitAudioContext; if(!AC)return;
         try{ctx=new AC({latencyHint:'interactive'})}catch(e){ctx=new AC()}
         var comp=ctx.createDynamicsCompressor();
-        master=ctx.createGain(); master.gain.value=0.9;
-        master.connect(comp); comp.connect(ctx.destination);
+        comp.threshold.value=-14; comp.knee.value=12; comp.ratio.value=3; comp.attack.value=0.004; comp.release.value=0.25;
+        var low=ctx.createBiquadFilter(); low.type='lowshelf'; low.frequency.value=220; low.gain.value=4;
+        var air=ctx.createBiquadFilter(); air.type='highshelf'; air.frequency.value=6000; air.gain.value=-3;
+        master=ctx.createGain(); master.gain.value=1;
+        master.connect(low);
+        try{
+          var verb=ctx.createConvolver(),wet=ctx.createGain();
+          verb.buffer=makeIR(2.4,3.2); wet.gain.value=0.24;
+          master.connect(verb); verb.connect(wet); wet.connect(low);
+        }catch(e){}
+        low.connect(air); air.connect(comp); comp.connect(ctx.destination);
         try{analyser=ctx.createAnalyser();analyser.fftSize=1024;comp.connect(analyser);wave=new Uint8Array(analyser.fftSize)}catch(e){analyser=null}
+        // short white-noise buffer for the hammer thump
+        noiseBuf=ctx.createBuffer(1,Math.floor(ctx.sampleRate*0.08),ctx.sampleRate);
+        var nd=noiseBuf.getChannelData(0); for(var i=0;i<nd.length;i++)nd[i]=Math.random()*2-1;
+        // string-like spectrum: partials fall off ~1/n^1.3, with a dip near the hammer strike point (7th)
+        var N=24,re=new Float32Array(N+1),im=new Float32Array(N+1);
+        for(var h=1;h<=N;h++)im[h]=Math.pow(h,-1.3)*(h%7===0?0.25:1);
+        try{pianoWave=ctx.createPeriodicWave(re,im)}catch(e){pianoWave=null}
       }
       if(ctx.state!=='running')ctx.resume();
     }catch(e){}
@@ -449,24 +471,45 @@ input[type="checkbox"]{accent-color:var(--accent); width:18px; height:18px; marg
     var t=ctx.currentTime, out=ctx.createGain(), oscs=[], rel=0.1;
     out.gain.setValueAtTime(0,t); out.connect(master);
     function add(wave,f,g,dest,det){
-      var o=ctx.createOscillator(); o.type=wave; o.frequency.setValueAtTime(f,t); if(det)o.detune.value=det;
+      var o=ctx.createOscillator();
+      if(wave==='piano'&&pianoWave)o.setPeriodicWave(pianoWave); else o.type=wave==='piano'?'triangle':wave;
+      o.frequency.setValueAtTime(f,t); if(det)o.detune.value=det;
       var gn=ctx.createGain(); gn.gain.value=g; o.connect(gn); gn.connect(dest); o.start(t); oscs.push(o);
+      return o;
     }
     if(type==='piano'){
-      var f=mtof(arg), dur=Math.max(0.9,Math.min(3.4,3.4-(arg-48)*0.045));
-      [[1,1],[2,0.5],[3,0.26],[4,0.14],[5,0.07]].forEach(function(p){add('sine',f*p[0]*(1+0.0005*p[0]*p[0]),p[1],out)});
-      out.gain.linearRampToValueAtTime(0.17,t+0.004);
-      out.gain.exponentialRampToValueAtTime(0.0008,t+dur);
-      oscs.forEach(function(o){o.stop(t+dur+0.05)});
-      rel=0.14;
+      var f=mtof(arg), dur=Math.max(1.2,Math.min(5,5-(arg-48)*0.07));
+      // brightness fades as the string rings: lowpass opens on the strike, then closes
+      var lp=ctx.createBiquadFilter(); lp.type='lowpass'; lp.Q.value=0.7; lp.connect(out);
+      var top=Math.min(16000,f*14),rest=Math.min(9000,Math.max(500,f*3));
+      lp.frequency.setValueAtTime(top,t); lp.frequency.exponentialRampToValueAtTime(rest,t+0.9);
+      // three slightly detuned strings (unison) for a chorused, full body + a pure fundamental
+      add('piano',f,0.42,lp,-4); add('piano',f,0.42,lp,0.5); add('piano',f,0.36,lp,4.5);
+      add('sine',f,0.55,out); if(arg<60)add('sine',f/2,0.12,out);
+      // hammer thump
+      var nz=ctx.createBufferSource(),bp=ctx.createBiquadFilter(),ng=ctx.createGain();
+      nz.buffer=noiseBuf; bp.type='bandpass'; bp.frequency.value=Math.min(5000,f*4); bp.Q.value=1.2;
+      ng.gain.setValueAtTime(0.35,t); ng.gain.exponentialRampToValueAtTime(0.001,t+0.05);
+      nz.connect(bp); bp.connect(ng); ng.connect(out); nz.start(t); nz.stop(t+0.08);
+      // two-stage decay: quick initial drop, then the long singing tail
+      out.gain.linearRampToValueAtTime(0.2,t+0.003);
+      out.gain.setTargetAtTime(0.09,t+0.003,0.12);
+      out.gain.setTargetAtTime(0,t+0.4,dur/4);
+      oscs.forEach(function(o){o.stop(t+dur+0.3)});
+      rel=0.25;
     }else if(type==='organ'){
-      var f2=mtof(arg), lp=ctx.createBiquadFilter();
-      lp.type='lowpass'; lp.frequency.value=2600; lp.Q.value=0.6; lp.connect(out);
-      add('triangle',f2,1,lp); add('sine',f2*2,0.35,lp); add('square',f2,0.12,lp,7); add('sine',f2/2,0.3,lp);
-      out.gain.linearRampToValueAtTime(0.16,t+0.012); rel=0.12;
+      var f2=mtof(arg), lp2=ctx.createBiquadFilter();
+      lp2.type='lowpass'; lp2.frequency.value=3200; lp2.Q.value=0.5; lp2.connect(out);
+      // drawbars 16' 8' 4' 2⅔' 2' + a little bite, with a slow rotary-style vibrato
+      var lfo=ctx.createOscillator(),lg=ctx.createGain(); lfo.frequency.value=5.6; lg.gain.value=7; lfo.connect(lg); lfo.start(t); oscs.push(lfo);
+      [[0.5,0.35],[1,1],[2,0.6],[3,0.3],[4,0.25]].forEach(function(p,i){var o=add('sine',f2*p[0],p[1],lp2,i%2?-3:3);lg.connect(o.detune)});
+      add('square',f2,0.05,lp2,5);
+      out.gain.linearRampToValueAtTime(0.11,t+0.015); rel=0.15;
     }else if(type==='chip'){
-      add('square',mtof(arg),1,out);
-      out.gain.linearRampToValueAtTime(0.09,t+0.002); rel=0.03;
+      var fc=mtof(arg);
+      add('square',fc,0.6,out,-7); add('square',fc,0.6,out,7); add('triangle',fc/2,0.5,out);
+      out.gain.linearRampToValueAtTime(0.08,t+0.002);
+      out.gain.setTargetAtTime(0.055,t+0.002,0.15); rel=0.05;
     }else{
       add('sine',arg[0],1,out); add('sine',arg[1],1,out);
       out.gain.linearRampToValueAtTime(0.11,t+0.004); rel=0.03;
