@@ -321,6 +321,25 @@ input[type="checkbox"]{accent-color:var(--accent); width:18px; height:18px; marg
         <button type="button" class="chip" data-mode="numpad" aria-pressed="false">Numpad</button>
         <button type="button" class="chip" data-mode="custom" aria-pressed="false">Custom</button>
       </div>
+      <div class="row" id="keyRow">
+        <label class="lbl" for="keysig">Minor</label>
+        <select id="keysig">
+          <option value="0">Off</option>
+          <option value="0">A minor</option>
+          <option value="1">E minor (F♯)</option>
+          <option value="2">B minor (F♯ C♯)</option>
+          <option value="3">F♯ minor (3♯)</option>
+          <option value="4">C♯ minor (4♯)</option>
+          <option value="5">G♯ minor (5♯)</option>
+          <option value="6">D♯ minor (6♯)</option>
+          <option value="-1">D minor (B♭)</option>
+          <option value="-2">G minor (B♭ E♭)</option>
+          <option value="-3">C minor (3♭)</option>
+          <option value="-4">F minor (4♭)</option>
+          <option value="-5">B♭ minor (5♭)</option>
+          <option value="-6">E♭ minor (6♭)</option>
+        </select>
+      </div>
       <p class="hint" id="hint"></p>
       <div id="customBox" class="ctrl" hidden>
         <div class="cgrid" id="cgrid" role="group" aria-label="Custom key notes"></div>
@@ -359,6 +378,8 @@ input[type="checkbox"]{accent-color:var(--accent); width:18px; height:18px; marg
   var DIA={'1':0,'2':2,'3':4,'4':5,'5':7,'6':9,'7':11,'8':12,'9':14,'*':16,'0':17,'#':19};
   // numpad mapping (7 8 9 on top): pitch rises left→right and bottom→top, so top to bottom 9 8 7 6 5 4 3 2 1 0 # * = D+ C+ B A G F E D C B- A- G-
   var NUMPAD={'1':0,'2':2,'3':4,'4':5,'5':7,'6':9,'7':11,'8':12,'9':14,'0':-1,'#':-3,'*':-5};
+  // key signatures: pitch classes raised in sharp order / lowered in flat order
+  var SHARP_ORDER=[5,0,7,2,9,4,11],FLAT_ORDER=[11,4,9,2,7,0,5];
   var PAD_ORDER={phone:KEYS,numpad:['7','8','9','4','5','6','1','2','3','*','#','0']};
   var DTMF={'1':[697,1209],'2':[697,1336],'3':[697,1477],'4':[770,1209],'5':[770,1336],'6':[770,1477],
             '7':[852,1209],'8':[852,1336],'9':[852,1477],'*':[941,1209],'0':[941,1336],'#':[941,1477]};
@@ -394,7 +415,7 @@ input[type="checkbox"]{accent-color:var(--accent); width:18px; height:18px; marg
     c.addEventListener('click',function(){theme=c.dataset.theme;save('theme',theme);applyTheme()});
   });
   applyTheme();
-  var state={mode:load('mode','orig'),voice:load('voice','piano'),oct:4,dial:'',last:'',song:'',idx:0};
+  var state={mode:load('mode','orig'),voice:load('voice','piano'),keysig:0,keyIdx:+load('keyIdx','0')||0,oct:4,dial:'',last:'',song:'',idx:0};
   // state.oct is the base octave (swipe / shake); the ▲▼ buttons only shift it while held
   var octHold={up:new Set(),dn:new Set()};
   if(state.mode==='sharp')state.mode='diatonic';
@@ -468,8 +489,14 @@ input[type="checkbox"]{accent-color:var(--accent); width:18px; height:18px; marg
   function semi(k){
     if(state.mode==='orig')return ORIG[k];
     if(state.mode==='custom')return CUSTOM[k];
-    if(state.mode==='numpad')return NUMPAD[k];
-    return DIA[k];
+    return withKey(state.mode==='numpad'?NUMPAD[k]:DIA[k]);
+  }
+  // apply the chosen minor key's signature to the natural-note layouts, e.g. D minor turns every B into A♯
+  function withKey(s){
+    var n=state.keysig,pc=((s%12)+12)%12;
+    if(n>0&&SHARP_ORDER.slice(0,n).indexOf(pc)>=0)return s+1;
+    if(n<0&&FLAT_ORDER.slice(0,-n).indexOf(pc)>=0)return s-1;
+    return s;
   }
   function nameSemi(s){return NAMES[((s%12)+12)%12]}
   function octMark(s){var o=Math.floor(s/12);return o<0?'↓':(o>0?'↑':'')}
@@ -527,6 +554,7 @@ input[type="checkbox"]{accent-color:var(--accent); width:18px; height:18px; marg
     PAD_ORDER[state.mode==='numpad'?'numpad':'phone'].forEach(function(k){pad.appendChild(keyEl[k])});
     elHint.textContent=dtmf?HINTS.dtmf:HINTS[state.mode];
     $('#customBox').hidden=state.mode!=='custom';
+    $('#keyRow').hidden=!(state.mode==='diatonic'||state.mode==='numpad');
   }
 
   /* ---------- custom key editor ---------- */
@@ -782,6 +810,12 @@ input[type="checkbox"]{accent-color:var(--accent); width:18px; height:18px; marg
   document.querySelectorAll('.chip[data-mode]').forEach(function(c){
     c.addEventListener('click',function(){state.mode=c.dataset.mode;save('mode',state.mode);syncChips();refreshLabels()});
   });
+  var ksel=$('#keysig');
+  function setKey(){
+    state.keysig=+ksel.value; state.keyIdx=ksel.selectedIndex; save('keyIdx',state.keyIdx); refreshLabels();
+  }
+  if(state.keyIdx>0&&state.keyIdx<ksel.options.length)ksel.selectedIndex=state.keyIdx;
+  ksel.addEventListener('change',setKey); setKey();
   $('#song').addEventListener('change',function(e){state.song=e.target.value;state.idx=0;refreshFollow()});
 
   /* ---------- settings sheet ---------- */
