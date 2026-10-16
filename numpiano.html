@@ -434,33 +434,47 @@ input[type="checkbox"]{accent-color:var(--accent); width:18px; height:18px; marg
     for(var c=0;c<2;c++){var d=ir.getChannelData(c);for(var i=0;i<n;i++)d[i]=(Math.random()*2-1)*Math.pow(1-i/n,decay)}
     return ir;
   }
+  // the core path (master → compressor → speakers) is wired first; every optional stage is added on its own
+  // so a browser that rejects one of them (reverb, EQ, analyser…) still plays sound
   function ensureAudio(){
     try{
       if(!ctx){
         var AC=window.AudioContext||window.webkitAudioContext; if(!AC)return;
         try{ctx=new AC({latencyHint:'interactive'})}catch(e){ctx=new AC()}
+        try{if(navigator.audioSession)navigator.audioSession.type='playback'}catch(e){}
         var comp=ctx.createDynamicsCompressor();
-        comp.threshold.value=-14; comp.knee.value=12; comp.ratio.value=3; comp.attack.value=0.004; comp.release.value=0.25;
-        var low=ctx.createBiquadFilter(); low.type='lowshelf'; low.frequency.value=220; low.gain.value=4;
-        var air=ctx.createBiquadFilter(); air.type='highshelf'; air.frequency.value=6000; air.gain.value=-3;
         master=ctx.createGain(); master.gain.value=1;
-        master.connect(low);
+        master.connect(comp); comp.connect(ctx.destination);
+        try{comp.threshold.value=-14; comp.knee.value=12; comp.ratio.value=3; comp.attack.value=0.004; comp.release.value=0.25}catch(e){}
         try{
-          var verb=ctx.createConvolver(),wet=ctx.createGain();
-          verb.buffer=makeIR(2.4,3.2); wet.gain.value=0.24;
-          master.connect(verb); verb.connect(wet); wet.connect(low);
-        }catch(e){}
-        low.connect(air); air.connect(comp); comp.connect(ctx.destination);
+          var low=ctx.createBiquadFilter(); low.type='lowshelf'; low.frequency.value=220; low.gain.value=4;
+          var air=ctx.createBiquadFilter(); air.type='highshelf'; air.frequency.value=6000; air.gain.value=-3;
+          low.connect(air); air.connect(comp);
+          master.disconnect(); master.connect(low);
+          try{
+            var verb=ctx.createConvolver(),wet=ctx.createGain();
+            verb.buffer=makeIR(2.4,3.2); wet.gain.value=0.24;
+            verb.connect(wet); wet.connect(low); master.connect(verb);
+          }catch(e){}
+        }catch(e){try{master.disconnect()}catch(e2){} master.connect(comp)}
         try{analyser=ctx.createAnalyser();analyser.fftSize=1024;comp.connect(analyser);wave=new Uint8Array(analyser.fftSize)}catch(e){analyser=null}
-        // short white-noise buffer for the hammer thump
-        noiseBuf=ctx.createBuffer(1,Math.floor(ctx.sampleRate*0.08),ctx.sampleRate);
-        var nd=noiseBuf.getChannelData(0); for(var i=0;i<nd.length;i++)nd[i]=Math.random()*2-1;
-        // string-like spectrum: partials fall off ~1/n^1.3, with a dip near the hammer strike point (7th)
-        var N=24,re=new Float32Array(N+1),im=new Float32Array(N+1);
-        for(var h=1;h<=N;h++)im[h]=Math.pow(h,-1.3)*(h%7===0?0.25:1);
-        try{pianoWave=ctx.createPeriodicWave(re,im)}catch(e){pianoWave=null}
+        try{
+          // short white-noise buffer for the hammer thump
+          noiseBuf=ctx.createBuffer(1,Math.floor(ctx.sampleRate*0.08),ctx.sampleRate);
+          var nd=noiseBuf.getChannelData(0); for(var i=0;i<nd.length;i++)nd[i]=Math.random()*2-1;
+        }catch(e){noiseBuf=null}
+        try{
+          // string-like spectrum: partials fall off ~1/n^1.3, with a dip near the hammer strike point (7th)
+          var N=24,re=new Float32Array(N+1),im=new Float32Array(N+1);
+          for(var h=1;h<=N;h++)im[h]=Math.pow(h,-1.3)*(h%7===0?0.25:1);
+          pianoWave=ctx.createPeriodicWave(re,im);
+        }catch(e){pianoWave=null}
       }
-      if(ctx.state!=='running')ctx.resume();
+      if(ctx.state!=='running'){
+        var r=ctx.resume(); if(r&&r.catch)r.catch(function(){});
+        // iOS: starting a silent buffer inside the gesture unlocks output
+        try{var sb=ctx.createBufferSource();sb.buffer=ctx.createBuffer(1,1,22050);sb.connect(ctx.destination);sb.start(0)}catch(e){}
+      }
     }catch(e){}
   }
   ['pointerup','touchend','click','keydown'].forEach(function(ev){document.addEventListener(ev,ensureAudio,{passive:true})});
@@ -468,6 +482,18 @@ input[type="checkbox"]{accent-color:var(--accent); width:18px; height:18px; marg
   function mtof(m){return 440*Math.pow(2,(m-69)/12)}
 
   function startVoice(type,arg){
+    try{return richVoice(type,arg)}
+    catch(e){
+      if(window.console)console.warn('numpiano: falling back to basic voice',e);
+      var t=ctx.currentTime,out=ctx.createGain(),o=ctx.createOscillator(),o2;
+      out.gain.setValueAtTime(0,t); out.gain.linearRampToValueAtTime(0.18,t+0.005); out.connect(master);
+      if(type==='dtmf'){o.frequency.value=arg[0];o2=ctx.createOscillator();o2.frequency.value=arg[1];o2.connect(out);o2.start(t)}
+      else{o.type=type==='chip'?'square':'triangle';o.frequency.value=mtof(arg)}
+      o.connect(out); o.start(t);
+      return {out:out,oscs:o2?[o,o2]:[o],rel:0.1};
+    }
+  }
+  function richVoice(type,arg){
     var t=ctx.currentTime, out=ctx.createGain(), oscs=[], rel=0.1;
     out.gain.setValueAtTime(0,t); out.connect(master);
     function add(wave,f,g,dest,det){
@@ -487,13 +513,15 @@ input[type="checkbox"]{accent-color:var(--accent); width:18px; height:18px; marg
       add('piano',f,0.42,lp,-4); add('piano',f,0.42,lp,0.5); add('piano',f,0.36,lp,4.5);
       add('sine',f,0.55,out); if(arg<60)add('sine',f/2,0.12,out);
       // hammer thump
+      if(noiseBuf){
       var nz=ctx.createBufferSource(),bp=ctx.createBiquadFilter(),ng=ctx.createGain();
       nz.buffer=noiseBuf; bp.type='bandpass'; bp.frequency.value=Math.min(5000,f*4); bp.Q.value=1.2;
       ng.gain.setValueAtTime(0.35,t); ng.gain.exponentialRampToValueAtTime(0.001,t+0.05);
       nz.connect(bp); bp.connect(ng); ng.connect(out); nz.start(t); nz.stop(t+0.08);
+      }
       // two-stage decay: quick initial drop, then the long singing tail
       out.gain.linearRampToValueAtTime(0.2,t+0.003);
-      out.gain.setTargetAtTime(0.09,t+0.003,0.12);
+      out.gain.setTargetAtTime(0.09,t+0.006,0.12);
       out.gain.setTargetAtTime(0,t+0.4,dur/4);
       oscs.forEach(function(o){o.stop(t+dur+0.3)});
       rel=0.25;
@@ -517,15 +545,16 @@ input[type="checkbox"]{accent-color:var(--accent); width:18px; height:18px; marg
     return {out:out,oscs:oscs,rel:rel};
   }
   function stopVoice(v){
+    var now=ctx.currentTime,end=now+v.rel+0.08;
     try{
-      var now=ctx.currentTime,p=v.out.gain;
+      var p=v.out.gain;
       if(p.cancelAndHoldAtTime){p.cancelAndHoldAtTime(now)}
       else{var c=p.value;p.cancelScheduledValues(now);p.setValueAtTime(c,now)}
-      p.setTargetAtTime(0,now,v.rel/3);
-      var end=now+v.rel+0.08;
-      v.oscs.forEach(function(o){try{o.stop(end)}catch(e){}});
-      v.oscs[0].onended=function(){try{v.out.disconnect()}catch(e){}};
-    }catch(e){}
+      try{p.setTargetAtTime(0,now,v.rel/3)}catch(e){p.linearRampToValueAtTime(0,now+v.rel)}
+    }catch(e){end=now}
+    // always stop the oscillators, even if the fade-out could not be scheduled
+    v.oscs.forEach(function(o){try{o.stop(end)}catch(e){}});
+    v.oscs[0].onended=function(){try{v.out.disconnect()}catch(e){}};
   }
 
   /* ---------- notes ---------- */
