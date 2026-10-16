@@ -159,6 +159,10 @@ input[type="range"]{accent-color:var(--accent); flex:1; min-width:0}
 input[type="checkbox"]{accent-color:var(--accent); width:18px; height:18px; margin:0}
 .sw{display:flex; align-items:center; gap:8px; font-size:.9rem; cursor:pointer}
 .status{font-size:.78rem; color:var(--muted); min-width:0; flex:1}
+.cgrid{display:grid; grid-template-columns:repeat(3,1fr); gap:8px}
+.cgrid label{display:flex; align-items:center; gap:6px; min-width:0; padding:4px 6px 4px 10px; border-radius:14px; background:var(--panel); box-shadow:inset 0 0 0 1px var(--line)}
+.cgrid b{font:700 1rem var(--f-lcd); min-width:.8em}
+.cgrid select{flex:1; min-width:0; padding:4px 6px; min-height:32px}
 .extras{display:flex; flex-direction:column; gap:12px; padding:12px 14px; background:var(--panel); border-radius:18px; box-shadow:inset 0 0 0 1px var(--line)}
 
 /* Keypad */
@@ -311,8 +315,13 @@ input[type="checkbox"]{accent-color:var(--accent); width:18px; height:18px; marg
         <span class="lbl">Keys</span>
         <button type="button" class="chip" data-mode="orig" aria-pressed="true">Chromatic</button>
         <button type="button" class="chip" data-mode="sharp" aria-pressed="false">♯/♭ hold</button>
+        <button type="button" class="chip" data-mode="custom" aria-pressed="false">Custom</button>
       </div>
       <p class="hint" id="hint"></p>
+      <div id="customBox" class="ctrl" hidden>
+        <div class="cgrid" id="cgrid" role="group" aria-label="Custom key notes"></div>
+        <div class="row"><button type="button" class="chip" id="cReset">Reset to Chromatic</button></div>
+      </div>
     </section>
     <section class="extras" aria-label="More">
       <div class="row">
@@ -355,16 +364,21 @@ input[type="checkbox"]{accent-color:var(--accent); width:18px; height:18px; marg
   var HINTS={
     orig:'1–7 = do–si (light keys). 8 9 0 * # = C♯ D♯ F♯ G♯ A♯ (dark keys).',
     sharp:'1–7 = do–si. Hold * for ♯, hold # for ♭. 8 9 0 = high do re mi.',
+    custom:'Pick a note for every key. ↑ / ↓ = one octave above / below the base octave.',
     dtmf:'Real phone dial tones (DTMF): two tones per key, no musical pitch.'
   };
 
   function load(k,d){try{var v=localStorage.getItem('dialpiano.'+k);return v==null?d:v}catch(e){return d}}
   function save(k,v){try{localStorage.setItem('dialpiano.'+k,v)}catch(e){}}
 
+  // custom mapping: semitones above the base C for each key, -12…+23
+  var CUSTOM={};
+  try{CUSTOM=JSON.parse(load('custom','{}'))||{}}catch(e){CUSTOM={}}
+  KEYS.forEach(function(k){var v=CUSTOM[k];if(typeof v!=='number'||v<-12||v>23||v!==Math.floor(v))CUSTOM[k]=ORIG[k]});
   var state={mode:load('mode','orig'),voice:load('voice','piano'),oct:4,sharp:0,flat:0,dial:'',last:'',song:'',idx:0};
   // state.oct is the base octave (swipe / shake); the ▲▼ buttons only shift it while held
   var octHold={up:new Set(),dn:new Set()};
-  if(state.mode!=='orig'&&state.mode!=='sharp')state.mode='orig';
+  if(['orig','sharp','custom'].indexOf(state.mode)<0)state.mode='orig';
   if(['piano','organ','chip','dtmf'].indexOf(state.voice)<0)state.voice='piano';
 
   var $=function(s){return document.querySelector(s)};
@@ -433,14 +447,16 @@ input[type="checkbox"]{accent-color:var(--accent); width:18px; height:18px; marg
   /* ---------- notes ---------- */
   function semi(k){
     if(state.mode==='orig')return ORIG[k];
+    if(state.mode==='custom')return CUSTOM[k];
     return NAT[k]+(state.sharp>0?1:0)-(state.flat>0?1:0);
   }
   function preferFlat(){return state.flat>0&&state.sharp===0}
   function nameSemi(s){return (preferFlat()?FLATS:NAMES)[((s%12)+12)%12]}
+  function octMark(s){var o=Math.floor(s/12);return o<0?'↓':(o>0?'↑':'')}
   function nameMidi(m){return nameSemi(m)+(Math.floor(m/12)-1)}
   // one step round the colour wheel per semitone, so the same pitch class always glows the same colour
   function hueOf(k){
-    var s=state.voice==='dtmf'?KEYS.indexOf(k)*7:(state.mode==='orig'?ORIG[k]:(k in NAT?semi(k):0));
+    var s=state.voice==='dtmf'?KEYS.indexOf(k)*7:(state.mode==='orig'?ORIG[k]:(state.mode==='custom'?CUSTOM[k]:(k in NAT?semi(k):0)));
     return (260+((s%12)+12)%12*30)%360;
   }
 
@@ -482,6 +498,7 @@ input[type="checkbox"]{accent-color:var(--accent); width:18px; height:18px; marg
       var el=keyEl[k],cls,sub;
       if(dtmf){cls='nat';sub=LETTERS[k]}
       else if(state.mode==='orig'){cls='1234567'.indexOf(k)>=0?'nat':'shp';sub=NAMES[ORIG[k]]}
+      else if(state.mode==='custom'){var cs=CUSTOM[k];cls=cs>=12?'hi':(NAMES[((cs%12)+12)%12].length>1?'shp':'nat');sub=NAMES[((cs%12)+12)%12]+octMark(cs)}
       else if(k==='*'){cls='mod';sub='♯ hold'}
       else if(k==='#'){cls='mod';sub='♭ hold'}
       else{var hiKey=(k==='8'||k==='9'||k==='0');cls=hiKey?'hi':'nat';sub=nameSemi(semi(k))+(hiKey?'↑':'')}
@@ -491,6 +508,27 @@ input[type="checkbox"]{accent-color:var(--accent); width:18px; height:18px; marg
       el.setAttribute('aria-label',k+(sub?' '+sub:''));
     });
     elHint.textContent=dtmf?HINTS.dtmf:HINTS[state.mode];
+    $('#customBox').hidden=state.mode!=='custom';
+  }
+
+  /* ---------- custom key editor ---------- */
+  var cSel={};
+  KEYS.forEach(function(k){
+    var l=document.createElement('label'),b=document.createElement('b'),sel=document.createElement('select');
+    b.textContent=k; sel.setAttribute('aria-label','Key '+k);
+    for(var s=-12;s<=23;s++){var o=document.createElement('option');o.value=s;o.textContent=NAMES[((s%12)+12)%12]+octMark(s);sel.appendChild(o)}
+    sel.addEventListener('change',function(){
+      CUSTOM[k]=+sel.value; save('custom',JSON.stringify(CUSTOM)); refreshLabels(); preview(CUSTOM[k]);
+    });
+    l.appendChild(b); l.appendChild(sel); $('#cgrid').appendChild(l); cSel[k]=sel;
+  });
+  function syncCustom(){KEYS.forEach(function(k){cSel[k].value=CUSTOM[k]})}
+  $('#cReset').addEventListener('click',function(){
+    KEYS.forEach(function(k){CUSTOM[k]=ORIG[k]}); save('custom',JSON.stringify(CUSTOM)); syncCustom(); refreshLabels();
+  });
+  function preview(s){
+    ensureAudio(); if(!ctx||!master||state.voice==='dtmf')return;
+    var v=startVoice(state.voice,(state.oct+1)*12+s); setTimeout(function(){stopVoice(v)},350);
   }
 
   function curOct(){
@@ -770,7 +808,7 @@ input[type="checkbox"]{accent-color:var(--accent); width:18px; height:18px; marg
   document.addEventListener('visibilitychange',function(){runViz(!document.hidden)});
   runViz(true);
 
-  syncChips(); refreshLabels(); refreshOct(); refreshFollow();
+  syncChips(); syncCustom(); refreshLabels(); refreshOct(); refreshFollow();
 })();
 </script>
 
