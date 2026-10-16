@@ -305,6 +305,12 @@ input[type="checkbox"]{accent-color:var(--accent); width:18px; height:18px; marg
     <div class="sheet-b">
     <section class="ctrl" aria-label="Sound and layout">
       <div class="row">
+        <span class="lbl">Theme</span>
+        <button type="button" class="chip" data-theme="auto" aria-pressed="true">Auto</button>
+        <button type="button" class="chip" data-theme="light" aria-pressed="false">☀ Day</button>
+        <button type="button" class="chip" data-theme="dark" aria-pressed="false">☾ Night</button>
+      </div>
+      <div class="row">
         <span class="lbl">Sound</span>
         <button type="button" class="chip" data-voice="piano" aria-pressed="true">Piano</button>
         <button type="button" class="chip" data-voice="organ" aria-pressed="false">Organ</button>
@@ -375,6 +381,18 @@ input[type="checkbox"]{accent-color:var(--accent); width:18px; height:18px; marg
   var CUSTOM={};
   try{CUSTOM=JSON.parse(load('custom','{}'))||{}}catch(e){CUSTOM={}}
   KEYS.forEach(function(k){var v=CUSTOM[k];if(typeof v!=='number'||v<-12||v>23||v!==Math.floor(v))CUSTOM[k]=ORIG[k]});
+  // theme: auto follows the system; day / night force it via data-theme on <html>
+  var theme=load('theme','auto');
+  if(['auto','light','dark'].indexOf(theme)<0)theme='auto';
+  function applyTheme(){
+    if(theme==='auto')document.documentElement.removeAttribute('data-theme');
+    else document.documentElement.setAttribute('data-theme',theme);
+    document.querySelectorAll('.chip[data-theme]').forEach(function(c){c.setAttribute('aria-pressed',String(c.dataset.theme===theme))});
+  }
+  document.querySelectorAll('.chip[data-theme]').forEach(function(c){
+    c.addEventListener('click',function(){theme=c.dataset.theme;save('theme',theme);applyTheme()});
+  });
+  applyTheme();
   var state={mode:load('mode','orig'),voice:load('voice','piano'),oct:4,sharp:0,flat:0,dial:'',last:'',song:'',idx:0};
   // state.oct is the base octave (swipe / shake); the ▲▼ buttons only shift it while held
   var octHold={up:new Set(),dn:new Set()};
