@@ -84,7 +84,7 @@ body{
 .lcd{
   position:relative; overflow:hidden; isolation:isolate;
   background:var(--screen); color:var(--screen-ink); border-radius:26px; padding:14px 16px 12px;
-  font-family:var(--f-lcd); min-height:118px;
+  font-family:var(--f-lcd); min-height:clamp(170px,26vh,230px); display:flex; flex-direction:column;
   -webkit-backdrop-filter:blur(18px) saturate(160%); backdrop-filter:blur(18px) saturate(160%);
   box-shadow:0 0 0 1px var(--screen-line), inset 0 1px 0 rgba(255,255,255,.08), 0 24px 50px -24px var(--shadow-c);
   user-select:none; -webkit-user-select:none;
@@ -95,9 +95,9 @@ body{
   background:radial-gradient(closest-side,hsl(var(--lh) 95% 60% / .38),transparent 72%);
 }
 .lcd canvas{position:absolute; inset:0; width:100%; height:100%; z-index:-1; pointer-events:none}
-.dial{min-height:1.3em; margin-right:118px; font-size:.9rem; letter-spacing:.22em; color:var(--screen-dim); white-space:nowrap; overflow:hidden}
+.dial{min-height:1.3em; margin:6px 120px 0 44px; font-size:.9rem; letter-spacing:.22em; color:var(--screen-dim); white-space:nowrap; overflow:hidden}
 .note{
-  font-size:2.7rem; line-height:1.12; min-height:1.12em; font-weight:800; letter-spacing:-.01em;
+  margin-top:auto; font-size:3.1rem; line-height:1.12; min-height:1.12em; font-weight:800; letter-spacing:-.01em;
   white-space:nowrap; overflow:hidden; text-overflow:ellipsis; transform-origin:0 60%;
   background:linear-gradient(95deg,hsl(var(--lh) 100% 76%),hsl(calc(var(--lh) + 60) 100% 72%));
   -webkit-background-clip:text; background-clip:text; color:transparent;
@@ -108,17 +108,17 @@ body{
   .note.pop{animation:pop .38s cubic-bezier(.2,.9,.25,1.4)}
   @keyframes pop{from{transform:scale(1.22) translateY(-2px); filter:blur(3px); opacity:.4}}
 }
-.note,.lcdhint{margin-right:78px}
+.note,.lcdhint{margin-right:120px}
 .lcdhint{min-height:1.4em; font-size:.66rem; color:var(--screen-dim); margin-top:7px}
 .lcdhint #prog{color:var(--screen-ink)}
 .gear{
-  position:absolute; top:8px; right:84px; width:36px; height:36px; display:grid; place-items:center;
+  position:absolute; top:8px; left:8px; width:40px; height:40px; display:grid; place-items:center;
   border:0; border-radius:12px; background:transparent; color:var(--screen-ink); cursor:pointer; padding:0;
   -webkit-tap-highlight-color:transparent; touch-action:manipulation; transition:background .2s;
 }
 .gear:hover{background:rgba(255,255,255,.1)}
 .gear:focus-visible{outline:2px solid var(--screen-ink); outline-offset:-2px}
-.gear svg{width:20px; height:20px; transition:transform .5s cubic-bezier(.3,1.4,.4,1)}
+.gear svg{width:22px; height:22px; transition:transform .5s cubic-bezier(.3,1.4,.4,1)}
 .gear:hover svg{transform:rotate(90deg)}
 
 /* Settings sheet */
@@ -228,9 +228,9 @@ input[type="checkbox"]{accent-color:var(--accent); width:18px; height:18px; marg
 }
 
 /* Octave hold buttons: stacked in the screen's top-right corner */
-.octv{position:absolute; z-index:1; top:10px; right:10px; bottom:10px; width:68px; display:flex; flex-direction:column; gap:6px}
+.octv{position:absolute; z-index:1; top:10px; right:10px; bottom:10px; width:104px; display:flex; flex-direction:column; gap:8px}
 .octbtn{
-  flex:1; min-height:44px; font:700 .82rem var(--f-lcd); border:0; border-radius:14px; padding:0;
+  flex:1; min-height:56px; font:700 1.05rem var(--f-lcd); border:0; border-radius:18px; padding:0;
   display:flex; align-items:center; justify-content:center;
   background:rgba(255,255,255,.08); color:var(--screen-ink); cursor:pointer; touch-action:none;
   -webkit-backdrop-filter:blur(8px); backdrop-filter:blur(8px);
@@ -282,7 +282,7 @@ input[type="checkbox"]{accent-color:var(--accent); width:18px; height:18px; marg
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
     </button>
     <div class="dial" id="dial">&nbsp;</div>
-    <div class="note dim" id="note">Tap any key</div>
+    <div class="note dim" id="note">♪</div>
     <div class="lcdhint"><span id="prog"></span></div>
     <div class="octv">
       <button type="button" class="octbtn" id="octUp" aria-pressed="false" aria-label="Hold for one octave up">▲ 8va</button>
