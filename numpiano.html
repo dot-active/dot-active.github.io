@@ -238,6 +238,7 @@ input[type="checkbox"]{accent-color:var(--accent); width:18px; height:18px; marg
   box-shadow:inset 0 0 0 1px rgba(255,255,255,.12);
   transition:transform .28s cubic-bezier(.2,.9,.3,1.6), box-shadow .3s, background .3s;
 }
+#octUp{font:600 2.4rem/1 var(--f-ui)}
 .octbtn:hover{background:rgba(255,255,255,.13)}
 .octbtn.held{
   background:linear-gradient(140deg,var(--accent),var(--accent-2)); color:var(--accent-ink); transform:scale(.94);
@@ -285,7 +286,7 @@ input[type="checkbox"]{accent-color:var(--accent); width:18px; height:18px; marg
     <div class="note dim" id="note">♪</div>
     <div class="lcdhint"><span id="prog"></span></div>
     <div class="octv">
-      <button type="button" class="octbtn" id="octUp" aria-pressed="false" aria-label="Hold for one octave up">▲ 8va</button>
+      <button type="button" class="octbtn" id="octUp" aria-pressed="false" aria-label="Hold for sharp (one semitone up)">♯</button>
       <button type="button" class="octbtn" id="octDn" aria-pressed="false" aria-label="Hold for one octave down">▼ 8vb</button>
     </div>
   </div>
@@ -558,7 +559,9 @@ input[type="checkbox"]{accent-color:var(--accent); width:18px; height:18px; marg
   }
 
   /* ---------- notes ---------- */
-  function semi(k){
+  // holding the ♯ button raises every key by a semitone
+  function semi(k){return baseSemi(k)+(octHold.up.size?1:0)}
+  function baseSemi(k){
     if(state.mode==='orig')return ORIG[k];
     if(state.mode==='custom')return CUSTOM[k];
     return withKey(state.mode==='numpad'?NUMPAD[k]:DIA[k]);
@@ -650,7 +653,7 @@ input[type="checkbox"]{accent-color:var(--accent); width:18px; height:18px; marg
   }
 
   function curOct(){
-    var d=(octHold.up.size?1:0)-(octHold.dn.size?1:0);
+    var d=octHold.dn.size?-1:0;
     return Math.max(2,Math.min(6,state.oct+d));
   }
   function refreshOct(){
@@ -738,7 +741,7 @@ input[type="checkbox"]{accent-color:var(--accent); width:18px; height:18px; marg
   }
   function releaseAll(){
     Array.from(active.keys()).forEach(releaseId);
-    octHold.up.clear(); octHold.dn.clear(); refreshOct();
+    octHold.up.clear(); octHold.dn.clear(); refreshOct(); refreshLabels();
   }
 
   pad.addEventListener('pointerdown',function(e){
@@ -773,11 +776,12 @@ input[type="checkbox"]{accent-color:var(--accent); width:18px; height:18px; marg
   document.addEventListener('visibilitychange',function(){if(document.hidden)releaseAll()});
 
   /* ---------- octave controls ---------- */
-  // momentary: the shift applies only while the button is held, then falls back to the base octave
+  // momentary: ▼ 8vb drops an octave and ♯ raises a semitone only while held ('up' set = ♯)
   function holdOct(dir,id,on){
     var s=octHold[dir];
     if(on){if(s.has(id))return;s.add(id)}else{if(!s.delete(id))return}
     refreshOct();
+    if(dir==='up')refreshLabels();
   }
   [['up','#octUp'],['dn','#octDn']].forEach(function(p){
     var b=$(p[1]),dir=p[0];
