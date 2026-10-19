@@ -242,6 +242,11 @@ input[type="checkbox"]{accent-color:var(--accent); width:18px; height:18px; marg
   box-shadow:0 0 18px -3px hsl(var(--h) 95% 60% / .9), inset 0 1px 0 rgba(255,255,255,.5);
 }
 .bub b{font:800 1.45rem var(--f-ui)}
+.bub i{position:absolute; font:800 .7rem/1 var(--f-ui); font-style:normal; padding:2px 4px; border-radius:6px; background:rgba(10,8,20,.75); color:#fff}
+.bub .m-sh{top:-6px; right:-6px}
+.bub .m-lo{bottom:-6px; right:-6px}
+.octbtn.need:not(.held){box-shadow:inset 0 0 0 2px hsl(var(--lh) 95% 70%), 0 0 18px -2px hsl(var(--lh) 95% 60%)}
+@media (prefers-reduced-motion:no-preference){.octbtn.need:not(.held){animation:beckon 1.1s ease-in-out infinite}}
 .bub small{font:600 .55rem var(--f-lcd); opacity:.85; margin-top:2px}
 .bub.hit{animation:bubHit .35s ease-out forwards}
 .bub.miss{animation:bubMiss .45s ease-in forwards}
@@ -359,7 +364,7 @@ input[type="checkbox"]{accent-color:var(--accent); width:18px; height:18px; marg
     <div class="sheet-h"><h2 id="songsTitle">Play along</h2><button type="button" class="xbtn" id="songsClose" aria-label="Close">✕</button></div>
     <div class="sheet-b">
       <div class="result" id="result" hidden></div>
-      <p class="hint">Pick a song: after 3 · 2 · 1 the keys slide in from the right. Press each one as it reaches the ring.</p>
+      <p class="hint">Pick a song: after 3 · 2 · 1 the keys slide in from the right. Press each one as it reaches the ring. A ♯ or ▼ badge means hold ♯ or ▼ 8vb at the same time.</p>
       <div class="songs" id="songList"></div>
     </div>
   </dialog>
@@ -490,9 +495,9 @@ input[type="checkbox"]{accent-color:var(--accent); width:18px; height:18px; marg
     {id:'greensleeves',lvl:'medium',name:'Greensleeves',by:'Traditional',icon:'🍃',bpm:90,
      notes:"6:.5 1' 2':.5 3':.75 4':.25 3':.5 2' 7:.5 5:.75 6:.25 7:.5 1' 6:.5 6:.75 #5:.25 6:.5 7 #5:.5 3 6:.5 1' 2':.5 3':.75 4':.25 3':.5 2' 7:.5 5:.75 6:.25 7:.5 1':.75 7:.25 6:.5 #5:.75 #4:.25 #5:.5 6:1.5 6"},
     // ---- hard ----
-    {id:'elise',lvl:'hard',name:'Für Elise',by:'Beethoven',icon:'💌',bpm:70,
+    {id:'elise',lvl:'hard',name:'Für Elise',by:'Beethoven',icon:'💌',bpm:60,
      notes:"3':.25 #2':.25 3':.25 #2':.25 3':.25 7:.25 2':.25 1':.25 6:.5 r:.25 1:.25 3:.25 6:.25 7:.5 r:.25 3:.25 #5:.25 7:.25 1':.5 r:.25 3:.25 3':.25 #2':.25 3':.25 #2':.25 3':.25 7:.25 2':.25 1':.25 6:.5 r:.25 1:.25 3:.25 6:.25 7:.5 r:.25 3:.25 1':.25 7:.25 6:1"},
-    {id:'turkish',lvl:'hard',name:'Turkish March',by:'Mozart',icon:'🥁',bpm:80,
+    {id:'turkish',lvl:'hard',name:'Turkish March',by:'Mozart',icon:'🥁',bpm:66,
      notes:"7,:.25 6,:.25 #5,:.25 6,:.25 1 2:.25 1:.25 7,:.25 1:.25 3 4:.25 3:.25 #2:.25 3:.25 7:.25 6:.25 #5:.25 6:.25 7:.25 6:.25 #5:.25 6:.25 1' 6:.5 1':.5 7:.5 6:.5 5:.5 6:.5 7:.5 6:.5 5:.5 6:.5 7:.5 6:.5 5:.5 #4:.5 3"},
     {id:'mountain',lvl:'hard',name:'In the Hall of the Mountain King',by:'Grieg',icon:'⛰️',bpm:110,
      notes:"6,:.5 7,:.5 1:.5 2:.5 3:.5 1:.5 3 #2:.5 7,:.5 #2 2:.5 #6,:.5 2 6,:.5 7,:.5 1:.5 2:.5 3:.5 1:.5 3:.5 6:.5 5:.5 3:.5 1:.5 3:.5 5:2"},
@@ -820,13 +825,16 @@ input[type="checkbox"]{accent-color:var(--accent); width:18px; height:18px; marg
     });
     return out;
   }
-  // the key that plays a pitch in the current layout (same octave first, then an octave away, then nearest)
+  // how to play a pitch on the current layout: a key, plus holding ♯ and/or ▼ 8vb when needed
+  // (fewest modifiers first); if the layout can't reach it at all, the same note an octave away is accepted
+  var MODS=[[0,0],[1,0],[0,1],[1,1]];
   function keyForPitch(p){
-    var tries=[p,p+12,p-12],i,j;
-    for(i=0;i<tries.length;i++)for(j=0;j<KEYS.length;j++)if(baseSemi(KEYS[j])===tries[i])return KEYS[j];
-    var best=KEYS[0],bd=99;
-    KEYS.forEach(function(k){var d=Math.abs(baseSemi(k)-p);if(d<bd){bd=d;best=k}});
-    return best;
+    var pass,i,j,k,v;
+    for(pass=0;pass<2;pass++)for(i=0;i<MODS.length;i++)for(j=0;j<KEYS.length;j++){
+      k=KEYS[j]; v=baseSemi(k)+MODS[i][0]-12*MODS[i][1];
+      if(pass?((v-p)%12+12)%12===0:v===p)return {k:k,sh:MODS[i][0],lo:MODS[i][1],fold:!!pass};
+    }
+    return {k:'1',sh:0,lo:0,fold:true};
   }
   function tick(hi){
     if(!ctx||!master)return;
@@ -850,7 +858,12 @@ input[type="checkbox"]{accent-color:var(--accent); width:18px; height:18px; marg
     stopGame(); releaseAll(); ensureAudio();
     var spb=60/song.bpm;
     game={song:song,start:0,raf:0,timers:[],perfect:0,good:0,miss:0,combo:0,maxCombo:0,endAt:0,target:null,
-      notes:parseSong(song.notes).map(function(n){return {T:TRAVEL+n.beat*spb,k:keyForPitch(n.p),p:n.p,el:null,res:null}})};
+      notes:parseSong(song.notes).map(function(n){
+        var m=keyForPitch(n.p);
+        return {T:TRAVEL+n.beat*spb,k:m.k,sh:m.sh,lo:m.lo,fold:m.fold,p:n.p,el:null,res:null};
+      })};
+    game.minGap=9;
+    for(var gi=1;gi<game.notes.length;gi++)game.minGap=Math.min(game.minGap,Math.max(0.05,game.notes[gi].T-game.notes[gi-1].T));
     lcd.classList.add('game'); lane.hidden=false; hud.hidden=false; songBtn.textContent='■'; songBtn.classList.add('on');
     songBtn.setAttribute('aria-label','Stop song');
     hudUpdate();
@@ -864,23 +877,29 @@ input[type="checkbox"]{accent-color:var(--accent); width:18px; height:18px; marg
   function loop(){
     if(!game)return;
     game.raf=requestAnimationFrame(loop);
-    var now=performance.now()/1000-game.start,speed=(lane.clientWidth-HITX+30)/TRAVEL,next=null,pending=0;
+    // scroll at least fast enough that back-to-back notes sit a bubble-width apart
+    var now=performance.now()/1000-game.start,dist=lane.clientWidth-HITX+30,next=null,pending=0;
+    var speed=Math.max(dist/TRAVEL,56/game.minGap),travel=dist/speed;
     for(var i=0;i<game.notes.length;i++){
       var n=game.notes[i]; if(n.res)continue;
       pending++;
       var dt=n.T-now;
-      if(dt>TRAVEL+0.15)break;
+      if(dt>travel+0.15)break;
       if(dt<-WINDOW){judgeNote(n,'miss');continue}
       if(!n.el){
         n.el=document.createElement('div'); n.el.className='bub'; n.el.style.setProperty('--h',(260+((n.p%12)+12)%12*30)%360);
-        n.el.innerHTML='<b></b><small></small>'; n.el.firstChild.textContent=n.k; n.el.lastChild.textContent=nameSemi(n.p);
+        n.el.innerHTML='<b></b><small></small>'+(n.sh?'<i class="m-sh">♯</i>':'')+(n.lo?'<i class="m-lo">▼</i>':'');
+        n.el.firstChild.textContent=n.k; n.el.children[1].textContent=nameSemi(n.p);
         lane.appendChild(n.el);
       }
       n.at='translate3d('+(HITX+dt*speed).toFixed(1)+'px,0,0)'; n.el.style.transform=n.at;
       if(!next)next=n;
     }
-    var tk=next?next.k:null;
-    if(tk!==game.target){game.target=tk;setTarget(tk)}
+    var tk=next?next.k+next.sh+next.lo:null;
+    if(tk!==game.target){
+      game.target=tk; setTarget(next&&next.k);
+      $('#octUp').classList.toggle('need',!!(next&&next.sh)); $('#octDn').classList.toggle('need',!!(next&&next.lo));
+    }
     if(!pending){
       if(!game.endAt)game.endAt=now+0.9;
       else if(now>game.endAt)finishSong();
@@ -903,11 +922,13 @@ input[type="checkbox"]{accent-color:var(--accent); width:18px; height:18px; marg
   function gamePress(k){
     if(!game||!game.start)return null;
     var now=performance.now()/1000-game.start,best=null,bd=9,near=null,nd=9;
+    var played=semi(k)-(octHold.dn.size?12:0);
     for(var i=0;i<game.notes.length;i++){
       var n=game.notes[i]; if(n.res)continue;
       if(n.T-now>WINDOW)break;
       var d=Math.abs(n.T-now); if(d>WINDOW)continue;
-      if(n.k===k&&d<bd){best=n;bd=d}
+      var ok=played===n.p||(n.fold&&((played-n.p)%12+12)%12===0);
+      if(ok&&d<bd){best=n;bd=d}
       if(d<nd){near=n;nd=d}
     }
     if(best){judgeNote(best,bd<=PERFECT?'perfect':'good');return best}
@@ -919,6 +940,7 @@ input[type="checkbox"]{accent-color:var(--accent); width:18px; height:18px; marg
     game.timers.forEach(clearTimeout); cancelAnimationFrame(game.raf);
     game.notes.forEach(function(n){if(n.el)n.el.remove()});
     game=null; setTarget(null);
+    $('#octUp').classList.remove('need'); $('#octDn').classList.remove('need');
     lcd.classList.remove('game'); lane.hidden=true; hud.hidden=true; elCd.hidden=true;
     songBtn.textContent='♫'; songBtn.classList.remove('on'); songBtn.setAttribute('aria-label','Play along');
   }
@@ -962,12 +984,12 @@ input[type="checkbox"]{accent-color:var(--accent); width:18px; height:18px; marg
     var dtmf=state.voice==='dtmf';
     setDown(k,1);
     state.dial+=k;
-    var entry={k:k},hit=gamePress(k);
+    var entry={k:k};
+    gamePress(k);
     if(ctx&&master){
       if(dtmf){entry.voice=startVoice('dtmf',DTMF[k]);entry.nm=DTMF[k][0]+'+'+DTMF[k][1]}
       else{
-        // in a song, a correct press plays the song's real note (it may need a sharp or octave the layout lacks)
-        var midi=(curOct()+1)*12+(hit&&hit.res!=='miss'?hit.p:semi(k));
+        var midi=(curOct()+1)*12+semi(k);
         entry.voice=startVoice(state.voice,midi);
         entry.nm=nameMidi(midi);
       }
