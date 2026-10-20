@@ -242,8 +242,12 @@ input[type="checkbox"]{accent-color:var(--accent); width:18px; height:18px; marg
   box-shadow:0 0 18px -3px hsl(var(--h) 95% 60% / .9), inset 0 1px 0 rgba(255,255,255,.5);
 }
 .bub.lo2{top:73%}
+.bub.long{align-items:flex-start; background:linear-gradient(90deg,hsl(var(--h) 95% 60%) 0 44px,hsl(var(--h) 90% 55% / .55) 60px,hsl(calc(var(--h) + 45) 90% 55% / .35))}
+.bub.long::after{content:""; position:absolute; left:44px; right:10px; top:50%; height:4px; margin-top:-2px; border-radius:2px; background:rgba(255,255,255,.55)}
+.bub.holding{box-shadow:0 0 26px 2px hsl(var(--h) 95% 62%), inset 0 0 0 2px #fff}
+.bub b,.bub small{width:44px; text-align:center}
 .bub b{font:800 1.35rem var(--f-ui)}
-.bub i{position:absolute; right:2px; font:800 .62rem/1 var(--f-ui); font-style:normal; padding:2px 3px; border-radius:5px; background:rgba(10,8,20,.7); color:#fff}
+.bub i{position:absolute; left:28px; font:800 .62rem/1 var(--f-ui); font-style:normal; padding:2px 3px; border-radius:5px; background:rgba(10,8,20,.7); color:#fff}
 .bub .m-sh{top:2px}
 .bub .m-lo{bottom:2px}
 .octbtn.need:not(.held){box-shadow:inset 0 0 0 2px hsl(var(--lh) 95% 70%), 0 0 18px -2px hsl(var(--lh) 95% 60%)}
@@ -365,7 +369,7 @@ input[type="checkbox"]{accent-color:var(--accent); width:18px; height:18px; marg
     <div class="sheet-h"><h2 id="songsTitle">Play along</h2><button type="button" class="xbtn" id="songsClose" aria-label="Close">✕</button></div>
     <div class="sheet-b">
       <div class="result" id="result" hidden></div>
-      <p class="hint">Pick a song: after 3 · 2 · 1 the keys slide in from the right. Press each one as it reaches the ring. A ♯ or ▼ badge means hold ♯ or ▼ 8vb at the same time.</p>
+      <p class="hint">Pick a song: after 3 · 2 · 1 the keys slide in from the right. Press each one as it reaches the ring; long bars mean keep holding until the bar runs out. A ♯ or ▼ badge means hold ♯ or ▼ 8vb at the same time.</p>
       <div class="songs" id="songList"></div>
     </div>
   </dialog>
@@ -820,7 +824,7 @@ input[type="checkbox"]{accent-color:var(--accent); width:18px; height:18px; marg
       if(m[1]!=='r'){
         var p=DEG[+m[3]-1]+(m[2]?1:0);
         m[4].split('').forEach(function(c){p+=c==="'"?12:-12});
-        out.push({beat:beat,p:p});
+        out.push({beat:beat,p:p,len:len});
       }
       beat+=len;
     });
@@ -861,7 +865,9 @@ input[type="checkbox"]{accent-color:var(--accent); width:18px; height:18px; marg
     game={song:song,start:0,raf:0,timers:[],perfect:0,good:0,miss:0,combo:0,maxCombo:0,endAt:0,target:null,
       notes:parseSong(song.notes).map(function(n){
         var m=keyForPitch(n.p);
-        return {T:TRAVEL+n.beat*spb,k:m.k,sh:m.sh,lo:m.lo,fold:m.fold,p:n.p,el:null,res:null};
+        // notes of 1.5+ beats (and long enough in time) become hold bars
+        var dur=n.len*spb,long=n.len>=1.5&&dur>=0.6;
+        return {T:TRAVEL+n.beat*spb,dur:long?dur*0.85:0,k:m.k,sh:m.sh,lo:m.lo,fold:m.fold,p:n.p,el:null,res:null};
       })};
     // notes alternate between a top and a bottom row, so only every second note can collide
     game.minGap=9;
@@ -883,7 +889,15 @@ input[type="checkbox"]{accent-color:var(--accent); width:18px; height:18px; marg
     var now=performance.now()/1000-game.start,dist=lane.clientWidth-HITX+30,next=null,pending=0;
     var speed=Math.max(dist/TRAVEL,52/game.minGap),travel=dist/speed;
     for(var i=0;i<game.notes.length;i++){
-      var n=game.notes[i]; if(n.res)continue;
+      var n=game.notes[i];
+      if(n.holding){
+        pending++;
+        if(now>=n.T+n.dur){endHold(n,true);continue}
+        n.el.style.transform='translate3d('+HITX+'px,0,0)';
+        n.el.style.width=Math.max(44,(n.T+n.dur-now)*speed+44)+'px';
+        continue;
+      }
+      if(n.res)continue;
       pending++;
       var dt=n.T-now;
       if(dt>travel+0.15)break;
@@ -892,8 +906,10 @@ input[type="checkbox"]{accent-color:var(--accent); width:18px; height:18px; marg
         n.el=document.createElement('div'); n.el.className='bub'+(i%2?' lo2':''); n.el.style.setProperty('--h',(260+((n.p%12)+12)%12*30)%360);
         n.el.innerHTML='<b></b><small></small>'+(n.sh?'<i class="m-sh">♯</i>':'')+(n.lo?'<i class="m-lo">▼</i>':'');
         n.el.firstChild.textContent=n.k; n.el.children[1].textContent=nameSemi(n.p);
+        if(n.dur){n.el.classList.add('long');n.el.dataset.dur=n.dur.toFixed(2)}
         lane.appendChild(n.el);
       }
+      if(n.dur)n.el.style.width=Math.max(44,n.dur*speed+44)+'px';
       n.at='translate3d('+(HITX+dt*speed).toFixed(1)+'px,0,0)'; n.el.style.transform=n.at;
       if(!next)next=n;
     }
@@ -907,21 +923,42 @@ input[type="checkbox"]{accent-color:var(--accent); width:18px; height:18px; marg
       else if(now>game.endAt)finishSong();
     }
   }
-  function judgeNote(n,res){
+  function judgeNote(n,res,id){
     n.res=res; game[res]++;
     if(res==='miss'){game.combo=0}else{game.combo++;game.maxCombo=Math.max(game.maxCombo,game.combo)}
-    if(n.el){
+    if(n.dur&&res!=='miss'&&n.el){n.holding=true;n.holdId=id;n.el.classList.add('holding')}
+    else if(n.el){
       var el=n.el; el.style.setProperty('--at',n.at||'none'); el.classList.add(res==='miss'?'miss':'hit');
       setTimeout(function(){el.remove()},500);
     }
-    elJudge.className='judge '+res; elJudge.textContent=res==='perfect'?'Perfect!':(res==='good'?'Good':'Miss');
-    restart(elJudge,'go');
+    showJudge(res,res==='perfect'?'Perfect!':(res==='good'?'Good':'Miss'));
     if(res!=='miss')restart(ring,'flash');
     hudUpdate();
   }
+  function showJudge(cls,txt){elJudge.className='judge '+cls; elJudge.textContent=txt; restart(elJudge,'go')}
+  // a hold ends when the bar runs out (full) or when the key is let go too early
+  function endHold(n,full){
+    n.holding=false;
+    var el=n.el; el.classList.remove('holding');
+    el.style.setProperty('--at','translate3d('+HITX+'px,0,0)'); el.classList.add(full?'hit':'miss');
+    setTimeout(function(){el.remove()},500);
+    if(full){showJudge('perfect','Hold ✓');restart(ring,'flash')}
+    else{
+      if(n.res==='perfect'){game.perfect--;game.good++;n.res='good'}
+      game.combo=0; showJudge('miss','Early!');
+    }
+    hudUpdate();
+  }
+  function gameRelease(id){
+    if(!game)return;
+    var now=performance.now()/1000-game.start;
+    game.notes.forEach(function(n){
+      if(n.holding&&n.holdId===id)endHold(n,now>=n.T+n.dur-0.25);
+    });
+  }
   // called on every key press while a song runs: the closest matching note inside the window is hit,
   // a wrong key while a note is due counts as a miss for that note
-  function gamePress(k){
+  function gamePress(k,id){
     if(!game||!game.start)return null;
     var now=performance.now()/1000-game.start,best=null,bd=9,near=null,nd=9;
     var played=semi(k)-(octHold.dn.size?12:0);
@@ -933,7 +970,7 @@ input[type="checkbox"]{accent-color:var(--accent); width:18px; height:18px; marg
       if(ok&&d<bd){best=n;bd=d}
       if(d<nd){near=n;nd=d}
     }
-    if(best){judgeNote(best,bd<=PERFECT?'perfect':'good');return best}
+    if(best){judgeNote(best,bd<=PERFECT?'perfect':'good',id);return best}
     if(near)judgeNote(near,'miss');
     return null;
   }
@@ -987,7 +1024,7 @@ input[type="checkbox"]{accent-color:var(--accent); width:18px; height:18px; marg
     setDown(k,1);
     state.dial+=k;
     var entry={k:k};
-    gamePress(k);
+    gamePress(k,id);
     if(ctx&&master){
       if(dtmf){entry.voice=startVoice('dtmf',DTMF[k]);entry.nm=DTMF[k][0]+'+'+DTMF[k][1]}
       else{
@@ -1008,6 +1045,7 @@ input[type="checkbox"]{accent-color:var(--accent); width:18px; height:18px; marg
     active.delete(id);
     setDown(en.k,-1);
     if(en.voice)stopVoice(en.voice);
+    gameRelease(id);
     render();
   }
   function releaseAll(){
