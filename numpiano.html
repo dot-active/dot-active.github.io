@@ -473,7 +473,8 @@ input[type="checkbox"]{accent-color:var(--accent); width:18px; height:18px; marg
     {id:'birthday',lvl:'easy',name:'Happy Birthday',by:'Hill sisters',icon:'🎂',bpm:100,
      notes:"5,:.75 5,:.25 6, 5, 1 7,:2 5,:.75 5,:.25 6, 5, 2 1:2 5,:.75 5,:.25 5 3 1 7, 6,:2 4:.75 4:.25 3 1 2 1:3"},
     {id:'ode',lvl:'easy',name:'Ode to Joy',by:'Beethoven',icon:'🎼',bpm:110,
-     notes:"3 3 4 5 5 4 3 2 1 1 2 3 3:1.5 2:.5 2:2 3 3 4 5 5 4 3 2 1 1 2 3 2:1.5 1:.5 1:2"},
+     notes:"3 3 4 5 5 4 3 2 1 1 2 3 3:1.5 2:.5 2:2 3 3 4 5 5 4 3 2 1 1 2 3 2:1.5 1:.5 1:2",
+     backing:"C G C G C G C G:2 C:2"},
     {id:'jingle',lvl:'easy',name:'Jingle Bells',by:'Pierpont',icon:'🛷',bpm:120,
      notes:"3 3 3:2 3 3 3:2 3 5 1:1.5 2:.5 3:2 r:2 4 4 4:1.5 4:.5 4 3 3 3:.5 3:.5 3 2 2 3 2:2 5:2"},
     {id:'bridal',lvl:'easy',name:'Bridal Chorus (Here Comes the Bride)',by:'Wagner',icon:'💍',bpm:80,
@@ -859,6 +860,52 @@ input[type="checkbox"]{accent-color:var(--accent); width:18px; height:18px; marg
     $('#hudSong').textContent=game.song.icon+' '+done+'/'+game.notes.length;
     $('#hudScore').innerHTML=game.combo>1?'<b>'+game.combo+'</b> combo':'';
   }
+  /* backing track: songs with a `backing` chord list (bar chords, :n = beats, default a 4/4 bar) get a
+     bass on beats 1 & 3 (root, then fifth) with a soft kick, chord stabs on 2 & 4, and a one-bar count-in */
+  var CHORDS={C:[0,4,7],Dm:[2,5,9],Em:[4,7,11],F:[5,9,12],G:[7,11,14],G7:[7,11,14,17],Am:[9,12,16]};
+  function parseBacking(str){
+    var out=[],beat=0;
+    str.trim().split(/\s+/).forEach(function(tok){
+      var m=/^(\w+)(?::([\d.]+))?$/.exec(tok); if(!m||!CHORDS[m[1]])return;
+      var len=m[2]?+m[2]:4; out.push({beat:beat,len:len,tones:CHORDS[m[1]]}); beat+=len;
+    });
+    return out;
+  }
+  function accTone(bus,t,midi,type,dur,peak,cutoff){
+    var o=ctx.createOscillator(),g=ctx.createGain(),f=ctx.createBiquadFilter();
+    o.type=type; o.frequency.value=mtof(midi);
+    f.type='lowpass'; f.frequency.value=cutoff;
+    g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(peak,t+0.008);
+    g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+    o.connect(f); f.connect(g); g.connect(bus); o.start(t); o.stop(t+dur+0.05);
+  }
+  function accKick(bus,t,peak){
+    var o=ctx.createOscillator(),g=ctx.createGain();
+    o.frequency.setValueAtTime(130,t); o.frequency.exponentialRampToValueAtTime(45,t+0.12);
+    g.gain.setValueAtTime(peak,t); g.gain.exponentialRampToValueAtTime(0.0001,t+0.22);
+    o.connect(g); g.connect(bus); o.start(t); o.stop(t+0.25);
+  }
+  function scheduleBacking(song,spb){
+    if(!song.backing||!ctx||!master)return null;
+    try{
+      var bus=ctx.createGain(); bus.gain.value=1; bus.connect(master);
+      var t0=ctx.currentTime+TRAVEL,base=(state.oct+1)*12;   // beat 0 = first melody note hits the ring
+      for(var c=-4;c<0;c++){var tc=t0+c*spb;if(tc>ctx.currentTime)accTone(bus,tc,base+24+(c===-4?7:0),'sine',0.08,0.12,8000)}
+      parseBacking(song.backing).forEach(function(ch){
+        var root=((ch.tones[0]%12)+12)%12,bass=base-24+root; if(root>7)bass-=12;
+        for(var b=0;b<ch.len;b++){
+          var gb=ch.beat+b,t=t0+gb*spb;
+          if(gb%2===0){
+            accTone(bus,t,gb%4===0?bass:bass+7,'triangle',spb*1.6,0.22,900);
+            accKick(bus,t,gb%4===0?0.22:0.14);
+          }else{
+            ch.tones.forEach(function(tone){accTone(bus,t,base-12+tone,'triangle',spb*0.55,0.045,2400)});
+          }
+        }
+      });
+      return bus;
+    }catch(e){return null}
+  }
   function startSong(song){
     stopGame(); releaseAll(); ensureAudio();
     var spb=60/song.bpm;
@@ -878,7 +925,10 @@ input[type="checkbox"]{accent-color:var(--accent); width:18px; height:18px; marg
     ['3','2','1','Play!'].forEach(function(txt,i){
       game.timers.push(setTimeout(function(){
         elCd.hidden=false; elCd.textContent=txt; restart(elCd,'go'); tick(i===3);
-        if(i===3){game.start=performance.now()/1000; game.raf=requestAnimationFrame(loop)}
+        if(i===3){
+          game.start=performance.now()/1000; game.raf=requestAnimationFrame(loop);
+          game.bus=scheduleBacking(song,spb);
+        }
       },i*700));
     });
   }
@@ -977,6 +1027,11 @@ input[type="checkbox"]{accent-color:var(--accent); width:18px; height:18px; marg
   function stopGame(){
     if(!game)return;
     game.timers.forEach(clearTimeout); cancelAnimationFrame(game.raf);
+    if(game.bus){
+      // fade out and drop whatever backing is still scheduled
+      var bus=game.bus; try{bus.gain.setTargetAtTime(0,ctx.currentTime,0.05)}catch(e){}
+      setTimeout(function(){try{bus.disconnect()}catch(e){}},400);
+    }
     game.notes.forEach(function(n){if(n.el)n.el.remove()});
     game=null; setTarget(null);
     $('#octUp').classList.remove('need'); $('#octDn').classList.remove('need');
@@ -1008,7 +1063,7 @@ input[type="checkbox"]{accent-color:var(--accent); width:18px; height:18px; marg
       var best=+load('best.'+song.id,'0')||0,count=parseSong(song.notes).length;
       b.innerHTML='<i></i><span><b></b><small></small></span><em></em>';
       b.querySelector('i').textContent=song.icon; b.querySelector('b').textContent=song.name;
-      b.querySelector('small').textContent=song.by+' · '+count+' notes';
+      b.querySelector('small').textContent=song.by+' · '+count+' notes'+(song.backing?' · 🎶 backing track':'');
       b.querySelector('em').textContent=best?best+'%':'';
       b.addEventListener('click',function(){songsDlg.close();startSong(song)});
       list.appendChild(b);
