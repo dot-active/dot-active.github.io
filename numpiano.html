@@ -860,9 +860,24 @@ input[type="checkbox"]{accent-color:var(--accent); width:18px; height:18px; marg
     $('#hudSong').textContent=game.song.icon+' '+done+'/'+game.notes.length;
     $('#hudScore').innerHTML=game.combo>1?'<b>'+game.combo+'</b> combo':'';
   }
-  /* backing track: songs with a `backing` chord list (bar chords, :n = beats, default a 4/4 bar) get a
-     bass on beats 1 & 3 (root, then fifth) with a soft kick, chord stabs on 2 & 4, and a one-bar count-in */
+  /* backing track: songs with a `backing` chord list (bar chords, :n = beats, default a 4/4 bar) get a small
+     synthesized orchestra, scheduled on the audio clock so it stays locked to the scrolling notes.
+     First half (soft): string section pad, cellos + basses, pizzicato on 2 & 4, clarinet arpeggios.
+     Second half (fuller): adds French horns, a flute descant and timpani.
+     Final chord: tutti with trumpets, a timpani roll into the last hit and a cymbal crash. */
   var CHORDS={C:[0,4,7],Dm:[2,5,9],Em:[4,7,11],F:[5,9,12],G:[7,11,14],G7:[7,11,14,17],Am:[9,12,16]};
+  var INST={
+    strings:{w:'sawtooth',det:[-9,0,8],cut:1800,a:0.35,r:0.6,peak:0.02,vib:[5.2,7]},
+    violins:{w:'sawtooth',det:[-7,6],cut:3200,a:0.3,r:0.8,peak:0.016,vib:[5.6,9]},
+    cello:{w:'sawtooth',det:[-5,5],cut:700,a:0.07,r:0.3,peak:0.06,vib:[5,5]},
+    contrabass:{w:'sawtooth',det:[0],cut:380,a:0.08,r:0.3,peak:0.06},
+    pizz:{w:'triangle',det:[0],cut:2000,a:0.004,pluck:0.28,peak:0.06},
+    clarinet:{w:'square',det:[0],cut:1300,a:0.025,r:0.06,peak:0.02},
+    horn:{w:'sawtooth',det:[-4,4],cut:850,a:0.2,r:0.5,peak:0.03,vib:[4.5,4]},
+    flute:{w:'sine',det:[0],cut:6000,a:0.09,r:0.25,peak:0.05,vib:[5.5,12]},
+    trumpet:{w:'sawtooth',det:[-3,3],cut:2600,a:0.04,r:0.5,peak:0.028,vib:[5.5,6]}
+  };
+  var crashBuf=null;
   function parseBacking(str){
     var out=[],beat=0;
     str.trim().split(/\s+/).forEach(function(tok){
@@ -871,40 +886,101 @@ input[type="checkbox"]{accent-color:var(--accent); width:18px; height:18px; marg
     });
     return out;
   }
-  function accTone(bus,t,midi,type,dur,peak,cutoff){
-    var o=ctx.createOscillator(),g=ctx.createGain(),f=ctx.createBiquadFilter();
-    o.type=type; o.frequency.value=mtof(midi);
-    f.type='lowpass'; f.frequency.value=cutoff;
-    g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(peak,t+0.008);
-    g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
-    o.connect(f); f.connect(g); g.connect(bus); o.start(t); o.stop(t+dur+0.05);
+  // one note of an orchestral voice: detuned oscillators → lowpass → envelope, optional vibrato
+  function play(bus,name,t,midi,dur,vol){
+    var o=INST[name],g=ctx.createGain(),f=ctx.createBiquadFilter(),peak=o.peak*(vol||1);
+    f.type='lowpass'; f.frequency.value=o.cut; f.connect(g); g.connect(bus);
+    g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(peak,t+o.a);
+    var stop;
+    if(o.pluck){g.gain.exponentialRampToValueAtTime(0.0001,t+o.a+o.pluck);stop=t+o.a+o.pluck+0.05}
+    else{var end=t+Math.max(dur,o.a+0.02);g.gain.setTargetAtTime(0.0001,end,o.r/3);stop=end+o.r+0.1}
+    var lg=null;
+    if(o.vib){var lfo=ctx.createOscillator();lg=ctx.createGain();lfo.frequency.value=o.vib[0];lg.gain.value=o.vib[1];lfo.connect(lg);lfo.start(t);lfo.stop(stop)}
+    o.det.forEach(function(d){
+      var os=ctx.createOscillator(); os.type=o.w; os.frequency.value=mtof(midi); os.detune.value=d;
+      if(lg)lg.connect(os.detune); os.connect(f); os.start(t); os.stop(stop);
+    });
   }
-  function accKick(bus,t,peak){
+  function timpani(bus,t,midi,vol){
+    var f0=mtof(midi);
+    [[1,1],[1.5,0.35],[2,0.2]].forEach(function(pt){
+      var o=ctx.createOscillator(),g=ctx.createGain();
+      o.frequency.setValueAtTime(f0*pt[0]*1.02,t); o.frequency.exponentialRampToValueAtTime(f0*pt[0],t+0.08);
+      g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(vol*pt[1],t+0.006);
+      g.gain.exponentialRampToValueAtTime(0.0001,t+1.3/pt[0]);
+      o.connect(g); g.connect(bus); o.start(t); o.stop(t+1.4);
+    });
+    if(noiseBuf){
+      var n=ctx.createBufferSource(),lp=ctx.createBiquadFilter(),ng=ctx.createGain();
+      n.buffer=noiseBuf; lp.type='lowpass'; lp.frequency.value=500;
+      ng.gain.setValueAtTime(vol*0.5,t); ng.gain.exponentialRampToValueAtTime(0.0001,t+0.07);
+      n.connect(lp); lp.connect(ng); ng.connect(bus); n.start(t); n.stop(t+0.08);
+    }
+  }
+  function cymbal(bus,t,vol){
+    if(!crashBuf){
+      crashBuf=ctx.createBuffer(1,Math.floor(ctx.sampleRate*2.5),ctx.sampleRate);
+      var d=crashBuf.getChannelData(0); for(var i=0;i<d.length;i++)d[i]=Math.random()*2-1;
+    }
+    var n=ctx.createBufferSource(),hp=ctx.createBiquadFilter(),g=ctx.createGain();
+    n.buffer=crashBuf; hp.type='highpass'; hp.frequency.value=4500;
+    g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(vol,t+0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001,t+2.4);
+    n.connect(hp); hp.connect(g); g.connect(bus); n.start(t); n.stop(t+2.5);
+  }
+  function click(bus,t,hi){
     var o=ctx.createOscillator(),g=ctx.createGain();
-    o.frequency.setValueAtTime(130,t); o.frequency.exponentialRampToValueAtTime(45,t+0.12);
-    g.gain.setValueAtTime(peak,t); g.gain.exponentialRampToValueAtTime(0.0001,t+0.22);
-    o.connect(g); g.connect(bus); o.start(t); o.stop(t+0.25);
+    o.frequency.value=hi?1760:1320; g.gain.setValueAtTime(0.0001,t);
+    g.gain.exponentialRampToValueAtTime(0.1,t+0.004); g.gain.exponentialRampToValueAtTime(0.0001,t+0.07);
+    o.connect(g); g.connect(bus); o.start(t); o.stop(t+0.1);
   }
   function scheduleBacking(song,spb){
     if(!song.backing||!ctx||!master)return null;
     try{
-      var bus=ctx.createGain(); bus.gain.value=1; bus.connect(master);
+      var bus=ctx.createGain(); bus.gain.value=0.85; bus.connect(master);
       var t0=ctx.currentTime+TRAVEL,base=(state.oct+1)*12;   // beat 0 = first melody note hits the ring
-      for(var c=-4;c<0;c++){var tc=t0+c*spb;if(tc>ctx.currentTime)accTone(bus,tc,base+24+(c===-4?7:0),'sine',0.08,0.12,8000)}
-      parseBacking(song.backing).forEach(function(ch){
-        var root=((ch.tones[0]%12)+12)%12,bass=base-24+root; if(root>7)bass-=12;
+      for(var c=-4;c<0;c++){var tc=t0+c*spb;if(tc>ctx.currentTime)click(bus,tc,c===-4)}
+      var chords=parseBacking(song.backing),last=chords[chords.length-1],half=(last.beat+last.len)/2;
+      chords.forEach(function(ch){
+        var tn=ch.tones,t=t0+ch.beat*spb,len=ch.len*spb,fin=ch===last,loud=ch.beat>=half;
+        var root=((tn[0]%12)+12)%12,bass=base-24+root; if(root>7)bass-=12;
+        var v=loud?1.35:1;
+        if(fin){
+          // tutti on the last chord
+          var ring=Math.max(len,spb*3);
+          for(var rb=0;rb<12;rb++)timpani(bus,t-2*spb+rb*spb/6,bass,0.05+rb*0.018);
+          timpani(bus,t,bass,0.42); cymbal(bus,t,0.12);
+          [base+tn[0],base+tn[1],base+tn[2]].forEach(function(m){play(bus,'trumpet',t,m,ring,1.2)});
+          [base-12+tn[0],base-12+tn[1],base-12+tn[2],base+tn[0]].forEach(function(m){play(bus,'strings',t,m,ring,1.5)});
+          play(bus,'violins',t,base+12+tn[0],ring,1.4); play(bus,'violins',t,base+12+tn[2],ring,1.2);
+          play(bus,'horn',t,base-12+tn[2],ring,1.4); play(bus,'flute',t,base+12+tn[2],ring,1);
+          play(bus,'cello',t,bass,ring,1.4); play(bus,'contrabass',t,bass-12,ring,1.4);
+          return;
+        }
+        // strings pad + low strings on the bass line (root, then fifth halfway through the bar)
+        [base-12+tn[0],base-12+tn[1],base-12+tn[2],base+tn[0]].forEach(function(m){play(bus,'strings',t,m,len,v)});
+        if(loud)play(bus,'violins',t,base+12+tn[0],len,1);
+        var h=len/2;
+        play(bus,'cello',t,bass,h,v); play(bus,'cello',t+h,bass+7,h,v);
+        play(bus,'contrabass',t,bass-12,h,v); play(bus,'contrabass',t+h,bass-5,h,v);
+        // pizzicato on beats 2 & 4, clarinet arpeggio in eighths
+        var arp=[tn[0],tn[1],tn[2],tn[0]+12,tn[2],tn[1],tn[2],tn[1]];
         for(var b=0;b<ch.len;b++){
-          var gb=ch.beat+b,t=t0+gb*spb;
-          if(gb%2===0){
-            accTone(bus,t,gb%4===0?bass:bass+7,'triangle',spb*1.6,0.22,900);
-            accKick(bus,t,gb%4===0?0.22:0.14);
-          }else{
-            ch.tones.forEach(function(tone){accTone(bus,t,base-12+tone,'triangle',spb*0.55,0.045,2400)});
-          }
+          var tb=t+b*spb;
+          if(b%2===1)tn.forEach(function(x){play(bus,'pizz',tb,base-12+x,0,loud?0.7:1)});
+          for(var e=0;e<2;e++)play(bus,'clarinet',tb+e*spb/2,base-12+arp[(b*2+e)%8],spb/2*0.9,loud?0.8:1);
+        }
+        if(loud){
+          // horns hold the chord, flute sings a descant (third, then fifth), timpani on 1 & 3
+          play(bus,'horn',t,base-12+tn[2],len,1); play(bus,'horn',t,base+tn[1],len,1);
+          play(bus,'flute',t,base+12+tn[1],h,1); play(bus,'flute',t+h,base+12+tn[2],h,1);
+          timpani(bus,t,bass,0.26); timpani(bus,t+h,bass+7,0.16);
+        }else{
+          timpani(bus,t,bass,0.14);
         }
       });
       return bus;
-    }catch(e){return null}
+    }catch(e){if(window.console)console.warn('numpiano: backing failed',e);return null}
   }
   function startSong(song){
     stopGame(); releaseAll(); ensureAudio();
