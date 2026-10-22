@@ -871,6 +871,8 @@ input[type="checkbox"]{accent-color:var(--accent); width:18px; height:18px; marg
     violins:{w:'sawtooth',det:[-7,6],cut:3200,a:0.3,r:0.8,peak:0.016,vib:[5.6,9]},
     cello:{w:'sawtooth',det:[-5,5],cut:700,a:0.07,r:0.3,peak:0.06,vib:[5,5]},
     contrabass:{w:'sawtooth',det:[0],cut:380,a:0.08,r:0.3,peak:0.06},
+    // plucked bass in a register phone speakers can reproduce; bright attack (filter sweep) marks every beat
+    bass:{w:'sawtooth',det:[-6,6],cut:520,fenv:5,a:0.006,pluck:0.42,peak:0.16},
     pizz:{w:'triangle',det:[0],cut:2000,a:0.004,pluck:0.28,peak:0.06},
     clarinet:{w:'square',det:[0],cut:1300,a:0.025,r:0.06,peak:0.02},
     horn:{w:'sawtooth',det:[-4,4],cut:850,a:0.2,r:0.5,peak:0.03,vib:[4.5,4]},
@@ -890,6 +892,7 @@ input[type="checkbox"]{accent-color:var(--accent); width:18px; height:18px; marg
   function play(bus,name,t,midi,dur,vol){
     var o=INST[name],g=ctx.createGain(),f=ctx.createBiquadFilter(),peak=o.peak*(vol||1);
     f.type='lowpass'; f.frequency.value=o.cut; f.connect(g); g.connect(bus);
+    if(o.fenv){f.frequency.setValueAtTime(o.cut*o.fenv,t);f.frequency.exponentialRampToValueAtTime(o.cut,t+0.18)}
     g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(peak,t+o.a);
     var stop;
     if(o.pluck){g.gain.exponentialRampToValueAtTime(0.0001,t+o.a+o.pluck);stop=t+o.a+o.pluck+0.05}
@@ -937,7 +940,7 @@ input[type="checkbox"]{accent-color:var(--accent); width:18px; height:18px; marg
   function scheduleBacking(song,spb){
     if(!song.backing||!ctx||!master)return null;
     try{
-      var bus=ctx.createGain(); bus.gain.value=0.85; bus.connect(master);
+      var bus=ctx.createGain(); bus.gain.value=1.2; bus.connect(master);
       var t0=ctx.currentTime+TRAVEL,base=(state.oct+1)*12;   // beat 0 = first melody note hits the ring
       for(var c=-4;c<0;c++){var tc=t0+c*spb;if(tc>ctx.currentTime)click(bus,tc,c===-4)}
       var chords=parseBacking(song.backing),last=chords[chords.length-1],half=(last.beat+last.len)/2;
@@ -955,13 +958,17 @@ input[type="checkbox"]{accent-color:var(--accent); width:18px; height:18px; marg
           play(bus,'violins',t,base+12+tn[0],ring,1.4); play(bus,'violins',t,base+12+tn[2],ring,1.2);
           play(bus,'horn',t,base-12+tn[2],ring,1.4); play(bus,'flute',t,base+12+tn[2],ring,1);
           play(bus,'cello',t,bass,ring,1.4); play(bus,'contrabass',t,bass-12,ring,1.4);
+          play(bus,'bass',t,bass+12,0,1.4);
           return;
         }
         // strings pad + low strings on the bass line (root, then fifth halfway through the bar)
         [base-12+tn[0],base-12+tn[1],base-12+tn[2],base+tn[0]].forEach(function(m){play(bus,'strings',t,m,len,v)});
         if(loud)play(bus,'violins',t,base+12+tn[0],len,1);
         var h=len/2;
-        play(bus,'cello',t,bass,h,v); play(bus,'cello',t+h,bass+7,h,v);
+        play(bus,'cello',t,bass,h,v*0.6); play(bus,'cello',t+h,bass+7,h,v*0.6);
+        // bass line on every beat: root, fifth, octave, fifth — accented on 1, a little on 3
+        var bl=bass+12,walk=[0,7,12,7];
+        for(var bb=0;bb<ch.len;bb++)play(bus,'bass',t+bb*spb,bl+walk[bb%4],0,bb===0?1.25:(bb===2?1.05:0.85));
         play(bus,'contrabass',t,bass-12,h,v); play(bus,'contrabass',t+h,bass-5,h,v);
         // pizzicato on beats 2 & 4, clarinet arpeggio in eighths
         var arp=[tn[0],tn[1],tn[2],tn[0]+12,tn[2],tn[1],tn[2],tn[1]];
