@@ -227,27 +227,32 @@ input[type="checkbox"]{accent-color:var(--accent); width:18px; height:18px; marg
   100%{opacity:0; transform:translate(calc(-50% + var(--dx,0px)),-260%) scale(1.25)}
 }
 
-/* Play-along game: notes slide right→left along a lane on the screen to the target ring */
+/* Play-along game: notes slide right→left in a single row along a full-width lane to the target ring;
+   the ♯ / ▼ 8vb hold buttons drop into a row under the lane so the lane gets the whole screen width */
+.lcd.game{min-height:200px}
+.lcd.game .lane{right:10px; bottom:auto; height:64px}
+.lcd.game .hud{right:16px}
+.lcd.game .octv{top:auto; left:10px; bottom:10px; width:auto; height:56px; flex-direction:row}
+.lcd.game .octbtn{min-height:0}
 .lcd .dial,.lcd .note{transition:opacity .25s}
 .lcd.game .dial,.lcd.game .note{opacity:0}
-.lane{position:absolute; z-index:1; left:10px; right:124px; top:52px; bottom:14px; border-radius:18px; overflow:hidden;
+.lane{--bw:44px; position:absolute; z-index:1; left:10px; right:124px; top:52px; bottom:14px; border-radius:18px; overflow:hidden;
   background:linear-gradient(90deg,rgba(255,255,255,.07),rgba(255,255,255,.02)); box-shadow:inset 0 0 0 1px rgba(255,255,255,.08)}
 .ring{position:absolute; left:9px; top:5px; bottom:5px; width:52px; border-radius:16px;
   box-shadow:inset 0 0 0 2px rgba(255,255,255,.55), 0 0 18px -2px hsl(var(--lh) 95% 60% / .8)}
 .ring.flash{box-shadow:inset 0 0 0 3px #fff, 0 0 30px 2px hsl(var(--lh) 95% 65%)}
 .bub{
-  --h:260; position:absolute; left:0; top:27%; width:44px; height:44px; margin:-22px 0 0 -22px; border-radius:13px;
+  --h:260; position:absolute; left:0; top:50%; width:var(--bw); height:44px; margin:-22px 0 0 calc(var(--bw) / -2); border-radius:13px;
   display:flex; flex-direction:column; align-items:center; justify-content:center; line-height:1; will-change:transform;
   background:linear-gradient(140deg,hsl(var(--h) 95% 62%),hsl(calc(var(--h) + 45) 95% 54%)); color:#fff;
   box-shadow:0 0 18px -3px hsl(var(--h) 95% 60% / .9), inset 0 1px 0 rgba(255,255,255,.5);
 }
-.bub.lo2{top:73%}
-.bub.long{align-items:flex-start; background:linear-gradient(90deg,hsl(var(--h) 95% 60%) 0 44px,hsl(var(--h) 90% 55% / .55) 60px,hsl(calc(var(--h) + 45) 90% 55% / .35))}
-.bub.long::after{content:""; position:absolute; left:44px; right:10px; top:50%; height:4px; margin-top:-2px; border-radius:2px; background:rgba(255,255,255,.55)}
+.bub.long{align-items:flex-start; background:linear-gradient(90deg,hsl(var(--h) 95% 60%) 0 var(--bw),hsl(var(--h) 90% 55% / .55) calc(var(--bw) + 16px),hsl(calc(var(--h) + 45) 90% 55% / .35))}
+.bub.long::after{content:""; position:absolute; left:var(--bw); right:8px; top:50%; height:4px; margin-top:-2px; border-radius:2px; background:rgba(255,255,255,.55)}
 .bub.holding{box-shadow:0 0 26px 2px hsl(var(--h) 95% 62%), inset 0 0 0 2px #fff}
-.bub b,.bub small{width:44px; text-align:center}
+.bub b,.bub small{width:var(--bw); text-align:center}
 .bub b{font:800 1.35rem var(--f-ui)}
-.bub i{position:absolute; left:28px; font:800 .62rem/1 var(--f-ui); font-style:normal; padding:2px 3px; border-radius:5px; background:rgba(10,8,20,.7); color:#fff}
+.bub i{position:absolute; left:calc(var(--bw) - 15px); font:800 .62rem/1 var(--f-ui); font-style:normal; padding:2px 3px; border-radius:5px; background:rgba(10,8,20,.7); color:#fff}
 .bub .m-sh{top:2px}
 .bub .m-lo{bottom:2px}
 .octbtn.need:not(.held){box-shadow:inset 0 0 0 2px hsl(var(--lh) 95% 70%), 0 0 18px -2px hsl(var(--lh) 95% 60%)}
@@ -1048,11 +1053,16 @@ input[type="checkbox"]{accent-color:var(--accent); width:18px; height:18px; marg
         var m=keyForPitch(n.p);
         // notes of 1.5+ beats (and long enough in time) become hold bars
         var dur=n.len*spb,long=n.len>=1.5&&dur>=0.6;
-        return {T:TRAVEL+n.beat*spb,dur:long?dur*0.85:0,k:m.k,sh:m.sh,lo:m.lo,fold:m.fold,p:n.p,el:null,res:null};
+        return {T:TRAVEL+n.beat*spb,dur:long?Math.min(dur*0.85,dur-0.2):0,k:m.k,sh:m.sh,lo:m.lo,fold:m.fold,p:n.p,el:null,res:null};
       })};
-    // notes alternate between a top and a bottom row, so only every second note can collide
-    game.minGap=9;
-    for(var gi=2;gi<game.notes.length;gi++)game.minGap=Math.min(game.minGap,Math.max(0.05,game.notes[gi].T-game.notes[gi-2].T));
+    // one row: remember the tightest spacing (note → next note, and end of a hold bar → next note)
+    // so the scroll speed and tile width can be chosen to keep neighbours from touching
+    game.gNote=9; game.gTail=9;
+    for(var gi=1;gi<game.notes.length;gi++){
+      var pv=game.notes[gi-1],gp=game.notes[gi].T-pv.T;
+      if(pv.dur)game.gTail=Math.min(game.gTail,Math.max(0.05,gp-pv.dur));
+      else game.gNote=Math.min(game.gNote,Math.max(0.05,gp));
+    }
     lcd.classList.add('game'); lane.hidden=false; hud.hidden=false; songBtn.textContent='■'; songBtn.classList.add('on');
     songBtn.setAttribute('aria-label','Stop song');
     hudUpdate();
@@ -1069,16 +1079,20 @@ input[type="checkbox"]{accent-color:var(--accent); width:18px; height:18px; marg
   function loop(){
     if(!game)return;
     game.raf=requestAnimationFrame(loop);
-    // scroll at least fast enough that back-to-back notes sit a bubble-width apart
+    // scroll at least fast enough that back-to-back tiles don't touch; in very fast songs the tiles
+    // get narrower instead of the scroll becoming unreadably quick
     var now=performance.now()/1000-game.start,dist=lane.clientWidth-HITX+30,next=null,pending=0;
-    var speed=Math.max(dist/TRAVEL,52/game.minGap),travel=dist/speed;
+    var bw=44,vmax=dist/1.3,need=function(w){return Math.max((w+4)/game.gNote,(w/2+4)/game.gTail)};
+    if(need(bw)>vmax)bw=Math.max(26,Math.floor(Math.min(vmax*game.gNote-4,2*(vmax*game.gTail-4))));
+    var speed=Math.max(dist/TRAVEL,need(bw)),travel=dist/speed;
+    if(bw!==game.bw){game.bw=bw;lane.style.setProperty('--bw',bw+'px')}
     for(var i=0;i<game.notes.length;i++){
       var n=game.notes[i];
       if(n.holding){
         pending++;
         if(now>=n.T+n.dur){endHold(n,true);continue}
         n.el.style.transform='translate3d('+HITX+'px,0,0)';
-        n.el.style.width=Math.max(44,(n.T+n.dur-now)*speed+44)+'px';
+        n.el.style.width=Math.max(bw,(n.T+n.dur-now)*speed+bw/2)+'px';
         continue;
       }
       if(n.res)continue;
@@ -1087,13 +1101,13 @@ input[type="checkbox"]{accent-color:var(--accent); width:18px; height:18px; marg
       if(dt>travel+0.15)break;
       if(dt<-WINDOW){judgeNote(n,'miss');continue}
       if(!n.el){
-        n.el=document.createElement('div'); n.el.className='bub'+(i%2?' lo2':''); n.el.style.setProperty('--h',(260+((n.p%12)+12)%12*30)%360);
+        n.el=document.createElement('div'); n.el.className='bub'; n.el.style.setProperty('--h',(260+((n.p%12)+12)%12*30)%360);
         n.el.innerHTML='<b></b><small></small>'+(n.sh?'<i class="m-sh">♯</i>':'')+(n.lo?'<i class="m-lo">▼</i>':'');
         n.el.firstChild.textContent=n.k; n.el.children[1].textContent=nameSemi(n.p);
         if(n.dur){n.el.classList.add('long');n.el.dataset.dur=n.dur.toFixed(2)}
         lane.appendChild(n.el);
       }
-      if(n.dur)n.el.style.width=Math.max(44,n.dur*speed+44)+'px';
+      if(n.dur)n.el.style.width=Math.max(bw,n.dur*speed+bw/2)+'px';
       n.at='translate3d('+(HITX+dt*speed).toFixed(1)+'px,0,0)'; n.el.style.transform=n.at;
       if(!next)next=n;
     }
