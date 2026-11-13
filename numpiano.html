@@ -258,6 +258,37 @@ input[type="checkbox"]{accent-color:var(--accent); width:18px; height:18px; marg
 .bub.hit{animation:bubHit .35s ease-out forwards}
 .bub.miss{animation:bubMiss .45s ease-in forwards}
 @keyframes bubHit{to{transform:var(--at) scale(1.7); opacity:0}}
+/* Perfect hit: the tile vanishes and its number bursts inside the ring — the digit splits into four shards
+   that spin away, a white flash and a shockwave ring expand, and sparks spray out (all clipped to the lane) */
+.bub.pop{animation:bubPop .09s ease-out forwards}
+@keyframes bubPop{to{transform:var(--at) scale(1.25); opacity:0}}
+.burst{--h:260; position:absolute; z-index:2; left:0; top:50%; width:0; height:0; pointer-events:none}
+.burst > *{position:absolute; left:0; top:0}
+.burst .fl{width:130px; height:130px; margin:-65px 0 0 -65px; border-radius:50%;
+  background:radial-gradient(circle,#fff 0 18%,hsl(var(--h) 100% 75% / .85) 34%,hsl(var(--h) 100% 60% / 0) 68%);
+  animation:bFlash .38s ease-out forwards}
+@keyframes bFlash{0%{transform:scale(.2); opacity:1}35%{opacity:.95}100%{transform:scale(1.5); opacity:0}}
+.burst .sw{width:56px; height:56px; margin:-28px 0 0 -28px; border-radius:16px;
+  box-shadow:0 0 0 3px hsl(var(--h) 100% 80%), 0 0 22px 4px hsl(var(--h) 100% 60%);
+  animation:bWave .5s cubic-bezier(.15,.7,.3,1) forwards}
+@keyframes bWave{from{transform:scale(.7) rotate(0); opacity:1}to{transform:scale(2.8) rotate(18deg); opacity:0}}
+.burst .sw2{animation-delay:.07s; opacity:0; border-radius:50%; box-shadow:0 0 0 2px #fff, 0 0 16px 2px hsl(var(--h) 100% 70%)}
+.burst .sh{width:60px; height:60px; margin:-30px 0 0 -30px; display:grid; place-items:center;
+  font:800 2.1rem var(--f-ui); color:#fff; text-shadow:0 0 10px hsl(var(--h) 100% 65%), 0 0 22px hsl(var(--h) 100% 55%);
+  animation:bShard .6s cubic-bezier(.12,.75,.3,1) forwards}
+.burst .s0{clip-path:inset(0 50% 50% 0)}  .burst .s1{clip-path:inset(0 0 50% 50%)}
+.burst .s2{clip-path:inset(50% 50% 0 0)}  .burst .s3{clip-path:inset(50% 0 0 50%)}
+@keyframes bShard{
+  0%{transform:scale(1.15); opacity:1}
+  14%{transform:scale(1.7); opacity:1}
+  70%{opacity:.9}
+  100%{transform:translate(var(--dx),var(--dy)) rotate(var(--r)) scale(1.3); opacity:0; filter:blur(1px)}
+}
+.burst .pt{width:9px; height:9px; margin:-4.5px 0 0 -4.5px; border-radius:2px;
+  background:hsl(var(--ph) 100% 72%); box-shadow:0 0 8px hsl(var(--ph) 100% 60%);
+  animation:bSpark .7s cubic-bezier(.1,.8,.3,1) forwards}
+@keyframes bSpark{from{transform:translate(0,0) rotate(0) scale(1.2); opacity:1}to{transform:translate(var(--dx),var(--dy)) rotate(var(--r)) scale(.2); opacity:0}}
+@media (prefers-reduced-motion:reduce){.burst .sh,.burst .pt,.burst .sw{display:none}}
 @keyframes bubMiss{to{transform:var(--at) translateY(26px) scale(.7); opacity:0; filter:grayscale(1)}}
 .hud{position:absolute; z-index:2; top:20px; left:100px; right:100px; display:flex; justify-content:space-between; gap:8px;
   font-size:.72rem; color:var(--screen-dim); white-space:nowrap; overflow:hidden}
@@ -1123,12 +1154,32 @@ input[type="checkbox"]{accent-color:var(--accent); width:18px; height:18px; marg
     if(res==='miss'){game.combo=0}else{game.combo++;game.maxCombo=Math.max(game.maxCombo,game.combo)}
     if(n.dur&&res!=='miss'&&n.el){n.holding=true;n.holdId=id;n.el.classList.add('holding')}
     else if(n.el){
-      var el=n.el; el.style.setProperty('--at',n.at||'none'); el.classList.add(res==='miss'?'miss':'hit');
+      var el=n.el; el.style.setProperty('--at',n.at||'none'); el.classList.add(res==='miss'?'miss':(res==='perfect'?'pop':'hit'));
       setTimeout(function(){el.remove()},500);
     }
+    if(res==='perfect')burst(n);
     showJudge(res,res==='perfect'?'Perfect!':(res==='good'?'Good':'Miss'));
     if(res!=='miss')restart(ring,'flash');
     hudUpdate();
+  }
+  // the perfect-hit explosion, centred on the ring: flash + shockwave + the digit in four shards + sparks
+  function burst(n){
+    var h=(260+((n.p%12)+12)%12*30)%360,b=document.createElement('div'),html='<div class="fl"></div><div class="sw"></div><div class="sw sw2"></div>';
+    b.className='burst'; b.style.setProperty('--h',h); b.style.transform='translate3d('+HITX+'px,0,0)';
+    var dirs=[[-1,-1],[1,-1],[-1,1],[1,1]];
+    dirs.forEach(function(d,i){
+      html+='<div class="sh s'+i+'" style="--dx:'+(d[0]*(42+Math.random()*18)).toFixed(0)+'px;--dy:'+(d[1]*(30+Math.random()*12)).toFixed(0)+
+        'px;--r:'+(d[0]*(60+Math.random()*70)).toFixed(0)+'deg"></div>';
+    });
+    for(var i=0;i<20;i++){
+      var a=i/20*Math.PI*2+Math.random()*0.35,d=50+Math.random()*50;
+      html+='<i class="pt" style="--ph:'+((h+Math.random()*80-40+360)%360).toFixed(0)+';--dx:'+(Math.cos(a)*d).toFixed(0)+'px;--dy:'+(Math.sin(a)*d*0.8).toFixed(0)+
+        'px;--r:'+(Math.random()*360).toFixed(0)+'deg"></i>';
+    }
+    b.innerHTML=html;
+    Array.prototype.forEach.call(b.querySelectorAll('.sh'),function(x){x.textContent=n.k});
+    lane.appendChild(b);
+    setTimeout(function(){b.remove()},700);
   }
   function showJudge(cls,txt){elJudge.className='judge '+cls; elJudge.textContent=txt; restart(elJudge,'go')}
   // a hold ends when the bar runs out (full) or when the key is let go too early
@@ -1137,7 +1188,7 @@ input[type="checkbox"]{accent-color:var(--accent); width:18px; height:18px; marg
     var el=n.el; el.classList.remove('holding');
     el.style.setProperty('--at','translate3d('+HITX+'px,0,0)'); el.classList.add(full?'hit':'miss');
     setTimeout(function(){el.remove()},500);
-    if(full){showJudge('perfect','Hold ✓');restart(ring,'flash')}
+    if(full){showJudge('perfect','Hold ✓');restart(ring,'flash');burst(n)}
     else{
       if(n.res==='perfect'){game.perfect--;game.good++;n.res='good'}
       game.combo=0; showJudge('miss','Early!');
