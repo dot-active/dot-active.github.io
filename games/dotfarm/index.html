@@ -1,0 +1,1705 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Dot Farm</title>
+<style>
+/* =========================================================
+   STYLES
+   ========================================================= */
+:root {
+  --header-h: 64px;
+  --footer-h: 88px;
+  --bg: #9fd77a;          /* grass around the field */
+  --bar: #5b3a1e;         /* header / footer wood colour */
+  --bar-text: #fff8e7;
+  --tile-open: #d9b27c;   /* available soil: light brown */
+  --tile-open-edge: #b88a52;
+  --tile-locked: #a8a8a8; /* locked: grey */
+  --tile-locked-edge: #8a8a8a;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg);
+  font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: none;      /* we handle touch ourselves (pointer events) */
+}
+
+#app {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+}
+
+/* ---------- Header ---------- */
+header {
+  height: var(--header-h);
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  background: var(--bar);
+  color: var(--bar-text);
+  box-shadow: 0 3px 0 rgba(0,0,0,.2);
+}
+.title { font-size: 22px; font-weight: 800; }
+.coins {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 26px;
+  font-weight: 800;
+  background: rgba(0,0,0,.25);
+  padding: 6px 16px;
+  border-radius: 999px;
+}
+.debug-badge {
+  display: none;
+  font-size: 14px;
+  font-weight: 800;
+  background: #ff5252;
+  color: #fff;
+  padding: 4px 10px;
+  border-radius: 999px;
+}
+.debug-on .debug-badge { display: inline-block; }
+
+/* ---------- Field ---------- */
+main {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
+}
+.field {
+  display: grid;
+  gap: 4px;
+  padding: 8px;
+  background: #7a5230;
+  border-radius: 12px;
+  box-shadow: 0 6px 0 rgba(0,0,0,.25);
+  /* Fill as much space as possible while keeping tiles square.
+     The grid's column/row counts and aspect ratio are set from CONFIG in JS. */
+  width: min(100%, calc((100dvh - var(--header-h) - var(--footer-h) - 24px) * var(--field-ratio)));
+  aspect-ratio: var(--field-ratio);
+  container-type: inline-size;   /* lets tiles size their emoji from the field width */
+}
+.tile {
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: calc(55cqw / var(--cols));
+  line-height: 1;
+  position: relative;
+}
+/* Countdown label on a growing crop */
+.tile-timer {
+  position: absolute;
+  left: 50%;
+  bottom: 6%;
+  transform: translateX(-50%);
+  padding: 1px 5px;
+  border-radius: 999px;
+  background: rgba(0,0,0,.6);
+  color: #fff;
+  font-size: calc(15cqw / var(--cols));
+  font-weight: 800;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.tile-timer:empty { display: none; }
+/* Drop highlight while dragging a seed over the field */
+.tile.drop-ok  { outline: 4px solid #43a047; outline-offset: -4px; }
+.tile.drop-bad { outline: 4px solid #e53935; outline-offset: -4px; }
+.tile.open {
+  background: var(--tile-open);
+  box-shadow: inset 0 -4px 0 var(--tile-open-edge);
+}
+.tile.locked {
+  background: var(--tile-locked);
+  box-shadow: inset 0 -4px 0 var(--tile-locked-edge);
+}
+
+/* ---------- Footer ---------- */
+footer {
+  height: var(--footer-h);
+  flex: none;
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  background: var(--bar);
+  box-shadow: 0 -3px 0 rgba(0,0,0,.2);
+  padding: 0 8px;
+}
+.tool-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  width: 76px;
+  padding: 6px 0;
+  border: none;
+  border-radius: 14px;
+  background: #f4d9a6;
+  color: #4a2e12;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 4px 0 #b88a52;
+}
+.tool-btn .icon { font-size: 32px; line-height: 1.1; }
+.tool-btn:active:not(:disabled) { transform: translateY(3px); box-shadow: 0 1px 0 #b88a52; }
+.tool-btn:disabled {
+  background: #9e9e9e;
+  color: #616161;
+  box-shadow: 0 4px 0 #757575;
+  cursor: not-allowed;
+}
+.tool-btn:disabled .icon { filter: grayscale(1); opacity: .5; }
+
+/* ---------- Toast message ---------- */
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(var(--footer-h) + 16px);
+  transform: translateX(-50%);
+  background: rgba(0,0,0,.75);
+  color: #fff;
+  font-size: 18px;
+  font-weight: 700;
+  padding: 10px 20px;
+  border-radius: 999px;
+  opacity: 0;
+  transition: opacity .2s;
+  pointer-events: none;
+  z-index: 1000001;
+}
+.toast.show { opacity: 1; }
+
+/* ---------- Draggable windows (Shop, ...) ---------- */
+.window {
+  position: fixed;
+  z-index: 10;
+  width: 230px;
+  background: #fff8e7;
+  border-radius: 14px;
+  box-shadow: 0 8px 24px rgba(0,0,0,.35);
+  overflow: hidden;
+  display: none;
+}
+.window.open { display: block; }
+.window-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 8px 8px 14px;
+  background: #8b5a2b;
+  color: #fff;
+  font-size: 18px;
+  font-weight: 800;
+  cursor: grab;
+  touch-action: none;
+}
+.window-title:active { cursor: grabbing; }
+.window-close {
+  width: 34px;
+  height: 34px;
+  border: none;
+  border-radius: 10px;
+  background: #e53935;
+  color: #fff;
+  font-size: 18px;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 0 3px 0 #a52a28;
+}
+.window-body {
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* ---------- Shop items ---------- */
+.shop-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  background: #f4d9a6;
+  border-radius: 12px;
+  box-shadow: 0 3px 0 #b88a52;
+  cursor: grab;
+  touch-action: none;
+}
+.shop-item .icon { font-size: 38px; line-height: 1; }
+.shop-item .name { font-size: 17px; font-weight: 800; color: #4a2e12; }
+.shop-item .price { font-size: 15px; font-weight: 700; color: #7a5230; }
+.shop-hint { font-size: 13px; color: #7a5230; text-align: center; }
+#shop-items, #build-items, #storage-items { display: flex; flex-direction: column; gap: 10px; }
+
+/* ---------- Storage ---------- */
+.storage-row { cursor: grab; touch-action: none; }
+.storage-empty {
+  padding: 14px;
+  border: 3px dashed #d2b48c;
+  border-radius: 12px;
+  text-align: center;
+  font-weight: 700;
+  color: #a1887f;
+}
+
+/* ---------- Buildings on the field ---------- */
+.tile.bld-pigpen {
+  background: #f6c1cc;
+  box-shadow: inset 0 0 0 4px #a0522d, inset 0 -6px 0 #a0522d;   /* wooden fence */
+}
+.tile.pen-empty .tile-icon { opacity: .3; }     /* "a pig can go here" */
+.tile.baby .tile-icon { font-size: 65%; }        /* baby animals are drawn smaller */
+.tile.bld-warehouse {
+  background: #c49a6c;
+  box-shadow: inset 0 0 0 4px #6d4c41, inset 0 -6px 0 #6d4c41;
+}
+
+/* ---------- Market ---------- */
+.window.drop-target { outline: 5px solid #43a047; }
+.market-head {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  font-weight: 700;
+  color: #7a5230;
+  padding: 0 6px;
+}
+.market-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: #f4d9a6;
+  border-radius: 12px;
+  box-shadow: 0 3px 0 #b88a52;
+  color: #4a2e12;
+}
+.market-row .icon  { font-size: 32px; line-height: 1; }
+.market-row .name  { flex: 1; font-size: 17px; font-weight: 800; }
+.market-row .price { font-size: 17px; font-weight: 800; }
+.market-row .arrow { width: 18px; text-align: center; font-size: 20px; font-weight: 900; color: #9e9e9e; }
+.market-row .arrow.up   { color: #2e7d32; }
+.market-row .arrow.down { color: #c62828; }
+
+/* The item that follows the finger/mouse while dragging */
+.drag-ghost {
+  position: fixed;
+  z-index: 1000000;       /* above every window */
+  font-size: 48px;
+  line-height: 1;
+  transform: translate(-50%, -50%);
+  pointer-events: none;   /* so we can see which tile is underneath */
+  filter: drop-shadow(0 4px 4px rgba(0,0,0,.3));
+}
+.drag-ghost.snap-back { transition: left .25s ease-out, top .25s ease-out, opacity .25s; opacity: 0; }
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <div class="title">🌱 Dot Farm</div>
+    <span class="debug-badge">⚡ x60</span>
+    <div class="coins">🪙 <span id="coin-count">0</span></div>
+  </header>
+
+  <main>
+    <div class="field" id="field"></div>
+  </main>
+
+  <footer id="toolbar"></footer>
+</div>
+
+<!-- Shop window -->
+<div class="window" id="shop-window">
+  <div class="window-title">
+    <span>🛒 Shop</span>
+    <button class="window-close" id="shop-close" aria-label="Close">✖</button>
+  </div>
+  <div class="window-body">
+    <div id="shop-items"></div>
+    <div class="shop-hint">Drag items onto your field!</div>
+  </div>
+</div>
+
+<!-- Market window -->
+<div class="window" id="market-window">
+  <div class="window-title">
+    <span>💰 Market</span>
+    <button class="window-close" id="market-close" aria-label="Close">✖</button>
+  </div>
+  <div class="window-body">
+    <div class="market-head"><span>We buy</span><span>Price</span></div>
+    <div id="market-items"></div>
+    <div class="shop-hint">Drag ripe crops here to sell!</div>
+  </div>
+</div>
+
+<!-- Build window -->
+<div class="window" id="build-window">
+  <div class="window-title">
+    <span>🔨 Build</span>
+    <button class="window-close" id="build-close" aria-label="Close">✖</button>
+  </div>
+  <div class="window-body">
+    <div id="build-items"></div>
+    <div class="shop-hint">Drag a building onto empty tiles!</div>
+  </div>
+</div>
+
+<!-- Storage window -->
+<div class="window" id="storage-window">
+  <div class="window-title">
+    <span>📦 Storage</span>
+    <button class="window-close" id="storage-close" aria-label="Close">✖</button>
+  </div>
+  <div class="window-body">
+    <div id="storage-items"></div>
+    <div class="shop-hint">Drag things here to keep them.<br>Drag them out to sell or use them!</div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* =========================================================
+   CONFIG — all game numbers live here. Change them freely!
+   ========================================================= */
+const CONFIG = {
+  // --- Field ---
+  fieldColumns: 10,      // number of tile columns
+  fieldRows: 5,          // number of tile rows
+
+  // Tiles that are available (not locked) at the very start.
+  // A rectangle: top-left corner (col,row), counted from 0, plus its size.
+  // The two left-most columns: 2 wide x 5 tall = 10 tiles.
+  startArea: { col: 0, row: 0, width: 2, height: 5 },
+
+  // --- Money ---
+  startCoins: 100,       // coins a new player starts with
+
+  // --- Crops ---
+  crops: {
+    corn: {
+      seedName: 'Corn Seed', // name shown in the shop
+      icon: '🌽',            // icon in the shop and while dragging
+      seedPrice: 10,         // coins to buy and plant one seed
+      seedlingIcon: '🌱',    // what the tile shows right after planting
+      growTimeMs: 10 * 60 * 1000, // time from planting to ripe (10 minutes)
+      name: 'Corn',          // name of the harvested crop in the Market
+      ripeIcon: '🌽',        // what the tile shows when ripe
+      basePrice: 20,         // average coins the Market pays for one
+    },
+  },
+
+  // --- Tools you can buy in the Shop ---
+  fertilizer: {
+    name: 'Fertilizer',    // name shown in the shop
+    icon: '🧪',            // icon in the shop and while dragging
+    price: 10,             // coins per use
+    timeSavedMs: 9 * 60 * 1000,  // makes a growing crop ripen this much earlier (9 minutes)
+  },
+  // --- Animals (bought in the Shop, placed in a Pigpen — one per pen tile) ---
+  animals: {
+    pig: {
+      name: 'Baby Pig',      // name shown in the shop
+      icon: '🐷',            // baby pig: shop, dragging, and on the field (drawn smaller)
+      price: 30,             // coins to buy one
+      growTimeMs: 10 * 60 * 1000, // time to grow into a big pig (10 minutes)
+      grownIcon: '🐖',       // big pig on the field
+      home: 'pigpen',        // building it must be placed in
+      grownGoods: 'bigPig',  // a big pig is sold / stored as these goods (see "products")
+      food: 'corn',          // drag this onto a growing baby to feed it
+      feedTimeSavedMs: 10 * 60 * 1000, // each feeding makes it grow up this much earlier (10 minutes)
+    },
+  },
+
+  // --- Pigpen production ---
+  // A pigpen holds 1 pig (on its first tile). While the pig is there, the
+  // second tile makes a Fertilizer or a Baby Pig. Nothing new is made until
+  // that one is collected (dragged away).
+  pigpen: {
+    // Each new thing appears after a random wait between these two times (no countdown is shown).
+    produceMinMs: 2 * 60 * 1000,  // shortest wait (2 minutes)
+    produceMaxMs: 8 * 60 * 1000,  // longest wait (8 minutes)
+    babyPigChance: 0.5,           // chance it is a Baby Pig (otherwise Fertilizer): 0.5 = half the time
+  },
+
+  // --- Products (goods that are not crops) ---
+  products: {
+    bigPig: {
+      name: 'Big Pig',
+      icon: '🐖',
+      basePrice: 50,         // average coins the Market pays for one
+    },
+  },
+
+  newLand: {
+    name: 'New Land',      // name shown in the shop
+    icon: '🚜',            // icon in the shop and while dragging
+    price: 100,            // coins to turn one locked (grey) tile into an available one
+  },
+
+  // --- Buildings (Build window) ---
+  buildings: {
+    pigpen: {
+      name: 'Pigpen',
+      icon: '🐷',          // icon in the Build window, while dragging, and on the field
+      cost: 50,            // coins to build one
+      size: 2,             // tiles it takes (2 side-by-side or one above the other)
+    },
+    warehouse: {
+      name: 'Warehouse',
+      icon: '🏠',
+      cost: 30,
+      size: 1,
+    },
+  },
+
+  // --- Market ---
+  market: {
+    priceUpdateMs: 30 * 1000, // prices change every 30 seconds
+    priceSwing: 0.30,         // prices move within ±30% of basePrice
+  },
+
+  tickMs: 1000,          // how often the game checks timers (real milliseconds)
+
+  // --- Footer tools ---
+  // "unlocked: true" means clickable from the start.
+  tools: [
+    { id: 'shop',    icon: '🛒', label: 'Shop',    unlocked: true  },
+    { id: 'build',   icon: '🔨', label: 'Build',   unlocked: true  },
+    { id: 'market',  icon: '💰', label: 'Market',  unlocked: false }, // unlocks when the first crop ripens
+    { id: 'storage', icon: '📦', label: 'Storage', unlocked: true  },
+  ],
+
+  // --- Debug ---
+  debugKey: 'f',         // press this key to toggle fast mode
+  debugSpeed: 60,        // how many times faster timers run in fast mode
+
+  // --- Saving ---
+  saveKey: 'dotfarm-save-v2',  // localStorage key (change it to start a fresh save)
+  saveEveryMs: 5000,           // auto-save interval (real milliseconds)
+};
+
+/* =========================================================
+   GAME CLOCK
+   All timers must use gameNow() instead of Date.now().
+   It is based on Date.now(), so time keeps passing while the
+   page is closed. In debug mode it runs CONFIG.debugSpeed x faster;
+   the extra time is stored in state.timeOffset so it survives reloads.
+   ========================================================= */
+let debugOn = false;
+let lastRealTime = Date.now();
+
+function gameNow() {
+  const real = Date.now();
+  if (debugOn) {
+    state.timeOffset += (real - lastRealTime) * (CONFIG.debugSpeed - 1);
+  }
+  lastRealTime = real;
+  return real + state.timeOffset;
+}
+
+function toggleDebug() {
+  gameNow();               // settle time at the current speed first
+  debugOn = !debugOn;
+  document.body.classList.toggle('debug-on', debugOn);
+  showToast(debugOn ? `Fast mode ON (x${CONFIG.debugSpeed})` : 'Fast mode OFF');
+  saveGame();
+}
+
+/* =========================================================
+   GOODS — everything that can be stored and sold
+   (crops + products), as [id, { name, icon, basePrice }]
+   ========================================================= */
+function goodsList() {
+  const list = Object.entries(CONFIG.crops)
+    .map(([id, c]) => [id, { name: c.name, icon: c.ripeIcon, basePrice: c.basePrice }]);
+  return list.concat(Object.entries(CONFIG.products));
+}
+function goodsInfo(id) {
+  const found = goodsList().find(([gid]) => gid === id);
+  return found ? found[1] : null;
+}
+
+// Anything that can sit in Storage: goods, Fertilizer, or an animal (baby).
+// Returns { name, icon } or null.
+function itemInfo(id) {
+  const g = goodsInfo(id);
+  if (g) return g;
+  if (id === 'fertilizer') return { name: CONFIG.fertilizer.name, icon: CONFIG.fertilizer.icon };
+  const a = CONFIG.animals[id];
+  if (a) return { name: a.name, icon: a.icon };
+  return null;
+}
+
+/* =========================================================
+   GAME STATE
+   ========================================================= */
+let state = null;
+
+function newGameState() {
+  const tiles = [];
+  const a = CONFIG.startArea;
+  for (let row = 0; row < CONFIG.fieldRows; row++) {
+    for (let col = 0; col < CONFIG.fieldColumns; col++) {
+      const inStart = col >= a.col && col < a.col + a.width &&
+                      row >= a.row && row < a.row + a.height;
+      // crop:     null when empty, or { type: 'corn', plantedAt: <game time ms> }
+      // building: null, or { type: 'pigpen', anchor: <index of its first tile> }
+      // animal:   null, or { type: 'pig', bornAt: <game time ms> } (only on a pen's first tile)
+      // product:  null, or 'fertilizer' / 'pig' waiting on a pen's second tile
+      // produceAt: game time the pen's second tile will make its next thing, or null
+      tiles.push({ col, row, unlocked: inStart, crop: null, building: null, animal: null,
+                   product: null, produceAt: null });
+    }
+  }
+  const tools = {};
+  CONFIG.tools.forEach(t => { tools[t.id] = t.unlocked; });
+
+  const prices = {}, change = {};
+  goodsList().forEach(([id, g]) => {
+    prices[id] = g.basePrice;
+    change[id] = 0;
+  });
+
+  return {
+    coins: CONFIG.startCoins,
+    tiles,
+    tools,           // which footer tools are unlocked
+    storage: {},     // goods kept for later: { corn: 3, ... }
+    market: {
+      prices,        // current price per crop
+      change,        // +1 went up, -1 went down, 0 no change (for the arrows)
+      lastUpdate: Date.now(), // game time of the last price change (new game: no offset yet)
+    },
+    timeOffset: 0,   // extra game time gained from debug fast mode (ms)
+  };
+}
+
+/* =========================================================
+   SAVE / LOAD (localStorage)
+   ========================================================= */
+function saveGame() {
+  try {
+    localStorage.setItem(CONFIG.saveKey, JSON.stringify(state));
+  } catch (e) {
+    // Storage may be blocked (private mode etc.) — the game still works.
+  }
+}
+
+function loadGame() {
+  try {
+    const raw = localStorage.getItem(CONFIG.saveKey);
+    if (!raw) return null;
+    const data = JSON.parse(raw);
+    // Basic sanity check: field size must match the current CONFIG.
+    if (!data || !Array.isArray(data.tiles) ||
+        data.tiles.length !== CONFIG.fieldColumns * CONFIG.fieldRows) return null;
+    // Fill in anything missing from older saves.
+    const fresh = newGameState();
+    const m = data.market || {};
+    // A tool is unlocked if the save says so OR CONFIG now unlocks it from the start.
+    const tools = {};
+    CONFIG.tools.forEach(t => { tools[t.id] = t.unlocked || !!(data.tools && data.tools[t.id]); });
+    return {
+      ...fresh,
+      ...data,
+      tools,
+      storage: { ...(data.storage || {}) },
+      market: {
+        ...fresh.market,
+        ...m,
+        prices: { ...fresh.market.prices, ...(m.prices || {}) },
+        change: { ...fresh.market.change, ...(m.change || {}) },
+      },
+    };
+  } catch (e) {
+    return null;
+  }
+}
+
+/* =========================================================
+   RENDERING
+   ========================================================= */
+const $ = id => document.getElementById(id);
+
+function renderCoins() {
+  $('coin-count').textContent = state.coins;
+}
+
+function renderField() {
+  const field = $('field');
+  field.style.gridTemplateColumns = `repeat(${CONFIG.fieldColumns}, 1fr)`;
+  field.style.gridTemplateRows = `repeat(${CONFIG.fieldRows}, 1fr)`;
+  field.style.setProperty('--field-ratio', `${CONFIG.fieldColumns} / ${CONFIG.fieldRows}`);
+  field.style.setProperty('--cols', CONFIG.fieldColumns);
+  field.innerHTML = '';
+  state.tiles.forEach((tile, i) => {
+    const el = document.createElement('div');
+    el.dataset.index = i;
+    el.innerHTML = '<span class="tile-icon"></span><span class="tile-timer"></span>';
+    field.appendChild(el);
+    renderTile(i);
+  });
+}
+
+function renderTile(i) {
+  const tile = state.tiles[i];
+  const el = $('field').children[i];
+  // classList.toggle keeps other classes (like drag highlights) intact.
+  el.classList.add('tile');
+  el.classList.toggle('open', tile.unlocked);
+  el.classList.toggle('locked', !tile.unlocked);
+  Object.keys(CONFIG.buildings).forEach(type => {
+    el.classList.toggle('bld-' + type, !!tile.building && tile.building.type === type);
+  });
+  let icon = '', timer = '', baby = false, penEmpty = false;
+  if (tile.animal) {
+    const a = CONFIG.animals[tile.animal.type];
+    const now = gameNow();
+    if (isGrown(tile, now)) {
+      icon = a.grownIcon;
+    } else {
+      icon = a.icon;
+      baby = true;
+      timer = formatTime(a.growTimeMs - (now - tile.animal.bornAt));
+    }
+  } else if (tile.product) {
+    // Something the pigpen made, waiting to be collected.
+    icon = itemInfo(tile.product).icon;
+    baby = !!CONFIG.animals[tile.product];
+  } else if (tile.building) {
+    if (tile.building.type === 'pigpen' && tile.building.anchor === i) {
+      // Empty pig tile: a faded pig shows "a pig can go here".
+      icon = CONFIG.buildings.pigpen.icon;
+      penEmpty = true;
+    } else if (tile.building.type === 'pigpen') {
+      // Production tile: stays empty until something appears (at a random time).
+    } else if (tile.building.anchor === i) {
+      icon = CONFIG.buildings[tile.building.type].icon;
+    }
+  } else if (tile.crop) {
+    const crop = CONFIG.crops[tile.crop.type];
+    const now = gameNow();
+    if (isRipe(tile, now)) {
+      icon = crop.ripeIcon;
+    } else {
+      icon = crop.seedlingIcon;
+      timer = formatTime(crop.growTimeMs - (now - tile.crop.plantedAt));
+    }
+  }
+  el.classList.toggle('baby', baby);
+  el.classList.toggle('pen-empty', penEmpty);
+  // Only touch the DOM when something changed.
+  const iconEl = el.children[0], timerEl = el.children[1];
+  if (iconEl.textContent !== icon) iconEl.textContent = icon;
+  if (timerEl.textContent !== timer) timerEl.textContent = timer;
+}
+
+// Milliseconds → "9:05" or "1:02:03" (rounded up, so it never shows 0:00 early).
+function formatTime(ms) {
+  const total = Math.max(0, Math.ceil(ms / 1000));
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const s = String(total % 60).padStart(2, '0');
+  return h > 0 ? `${h}:${String(m).padStart(2, '0')}:${s}` : `${m}:${s}`;
+}
+
+function renderMarket() {
+  const list = $('market-items');
+  list.innerHTML = '';
+  goodsList().forEach(([id, g]) => {
+    const dir = state.market.change[id];
+    const arrow = dir > 0 ? '<span class="arrow up">↑</span>'
+                : dir < 0 ? '<span class="arrow down">↓</span>'
+                : '<span class="arrow">–</span>';
+    const row = document.createElement('div');
+    row.className = 'market-row';
+    row.innerHTML = `
+      <span class="icon">${g.icon}</span>
+      <span class="name">${g.name}</span>
+      <span class="price">🪙 ${state.market.prices[id]}</span>
+      ${arrow}`;
+    list.appendChild(row);
+  });
+}
+
+function renderShop() {
+  const list = $('shop-items');
+  list.innerHTML = '';
+  Object.entries(CONFIG.crops).forEach(([id, crop]) => {
+    const item = document.createElement('div');
+    item.className = 'shop-item';
+    item.dataset.crop = id;
+    item.innerHTML = `
+      <span class="icon">${crop.icon}</span>
+      <div>
+        <div class="name">${crop.seedName}</div>
+        <div class="price">🪙 ${crop.seedPrice}</div>
+      </div>`;
+    list.appendChild(item);
+  });
+
+  Object.entries(CONFIG.animals).forEach(([id, a]) => {
+    const item = document.createElement('div');
+    item.className = 'shop-item';
+    item.dataset.animal = id;
+    item.innerHTML = `
+      <span class="icon">${a.icon}</span>
+      <div>
+        <div class="name">${a.name}</div>
+        <div class="price">🪙 ${a.price}</div>
+      </div>`;
+    list.appendChild(item);
+  });
+
+  // Non-seed items: data-item is the CONFIG key.
+  ['fertilizer', 'newLand'].forEach(key => {
+    const f = CONFIG[key];
+    const item = document.createElement('div');
+    item.className = 'shop-item';
+    item.dataset.item = key;
+    item.innerHTML = `
+      <span class="icon">${f.icon}</span>
+      <div>
+        <div class="name">${f.name}</div>
+        <div class="price">🪙 ${f.price}</div>
+      </div>`;
+    list.appendChild(item);
+  });
+}
+
+function renderBuild() {
+  const list = $('build-items');
+  list.innerHTML = '';
+  Object.entries(CONFIG.buildings).forEach(([id, b]) => {
+    const item = document.createElement('div');
+    item.className = 'shop-item';
+    item.dataset.building = id;
+    item.innerHTML = `
+      <span class="icon">${b.icon}</span>
+      <div>
+        <div class="name">${b.name}</div>
+        <div class="price">🪙 ${b.cost} · ${b.size} tile${b.size > 1 ? 's' : ''}</div>
+      </div>`;
+    list.appendChild(item);
+  });
+}
+
+function renderStorage() {
+  const list = $('storage-items');
+  list.innerHTML = '';
+  const goods = Object.entries(state.storage).filter(([, n]) => n > 0);
+  if (goods.length === 0) {
+    list.innerHTML = '<div class="storage-empty">Empty</div>';
+    return;
+  }
+  goods.forEach(([id, count]) => {
+    const g = itemInfo(id);
+    if (!g) return;
+    const row = document.createElement('div');
+    row.className = 'market-row storage-row';
+    row.dataset.goods = id;
+    row.innerHTML = `
+      <span class="icon">${g.icon}</span>
+      <span class="name">${g.name}</span>
+      <span class="price">× ${count}</span>`;
+    list.appendChild(row);
+  });
+}
+
+function renderToolbar() {
+  const bar = $('toolbar');
+  bar.innerHTML = '';
+  CONFIG.tools.forEach(t => {
+    const btn = document.createElement('button');
+    btn.className = 'tool-btn';
+    btn.dataset.tool = t.id;
+    btn.disabled = !state.tools[t.id];
+    btn.innerHTML = `<span class="icon">${t.icon}</span><span>${t.label}</span>`;
+    bar.appendChild(btn);
+  });
+}
+
+function renderAll() {
+  renderCoins();
+  renderField();
+  renderToolbar();
+  renderShop();
+  renderMarket();
+  renderBuild();
+  renderStorage();
+}
+
+/* ---------- Toast ---------- */
+let toastTimer = null;
+function showToast(text) {
+  const t = $('toast');
+  t.textContent = text;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 1500);
+}
+
+/* =========================================================
+   FARMING ACTIONS
+   ========================================================= */
+// A seed (or a building) can go only on an unlocked tile with nothing on it.
+function canPlantOn(index) {
+  const tile = state.tiles[index];
+  return !!tile && tile.unlocked && !tile.crop && !tile.building;
+}
+
+// Returns true if planting worked.
+function plantSeed(cropId, index) {
+  const price = CONFIG.crops[cropId].seedPrice;
+  if (!canPlantOn(index)) return false;
+  if (state.coins < price) {
+    showToast('Not enough coins! 🪙');
+    return false;
+  }
+  state.coins -= price;
+  state.tiles[index].crop = { type: cropId, plantedAt: gameNow() };
+  renderCoins();
+  renderTile(index);
+  saveGame();
+  return true;
+}
+
+// Fertilizer works only on a crop that is still growing.
+function canFertilize(index) {
+  const tile = state.tiles[index];
+  return !!tile && !!tile.crop && !isRipe(tile);
+}
+
+// Returns true if fertilizing worked (the fertilizer is used up).
+// free = true for fertilizer the player already owns (made by a pigpen).
+function useFertilizer(index, free = false) {
+  const f = CONFIG.fertilizer;
+  if (!canFertilize(index)) return false;
+  if (!free && state.coins < f.price) {
+    showToast('Not enough coins! 🪙');
+    return false;
+  }
+  if (!free) state.coins -= f.price;
+  // Planting "earlier" makes it ripen earlier.
+  state.tiles[index].crop.plantedAt -= f.timeSavedMs;
+  renderCoins();
+  renderTile(index);
+  saveGame();
+  return true;
+}
+
+// The other tile of a 2-tile building (a pigpen's production tile), or -1.
+function partnerIndex(index) {
+  const b = state.tiles[index].building;
+  if (!b) return -1;
+  return state.tiles.findIndex((t, j) => j !== index && t.building && t.building.anchor === b.anchor);
+}
+
+// The pen tile for a dropped pig: the pen's first tile (the pig tile).
+// Dropping on either tile of the pen works. Returns -1 if there is no room.
+function animalSpot(type, index) {
+  const tile = state.tiles[index];
+  if (!tile || !tile.building || tile.building.type !== CONFIG.animals[type].home) return -1;
+  const spot = tile.building.anchor;
+  return state.tiles[spot].animal ? -1 : spot;   // a pen holds only 1 animal
+}
+function canPlaceAnimal(type, index) {
+  return animalSpot(type, index) >= 0;
+}
+
+// Returns true if the animal was placed.
+// free = true for a baby the player already owns (made by a pigpen).
+function placeAnimal(type, index, free = false) {
+  const a = CONFIG.animals[type];
+  const spot = animalSpot(type, index);
+  if (spot < 0) return false;
+  if (!free && state.coins < a.price) {
+    showToast('Not enough coins! 🪙');
+    return false;
+  }
+  if (!free) state.coins -= a.price;
+  state.tiles[spot].animal = { type, bornAt: gameNow() };
+  // The pen's second tile starts making something (unless it is still holding one).
+  const p = partnerIndex(spot);
+  if (p >= 0 && !state.tiles[p].product) state.tiles[p].produceAt = nextProduceTime(gameNow());
+  renderCoins();
+  renderTile(spot);
+  if (p >= 0) renderTile(p);
+  saveGame();
+  return true;
+}
+
+/* ---------- Items you own (from Storage or a pigpen), used on a tile ---------- */
+function canUseItemOn(id, index) {
+  if (id === 'fertilizer') return canFertilize(index);
+  if (CONFIG.animals[id]) return canPlaceAnimal(id, index);
+  return false;
+}
+function useItemOn(id, index) {
+  if (id === 'fertilizer') return useFertilizer(index, true);
+  if (CONFIG.animals[id]) return placeAnimal(id, index, true);
+  return false;
+}
+
+/* ---------- Pigpen production ---------- */
+// A random moment between produceMinMs and produceMaxMs from now.
+function nextProduceTime(now) {
+  const { produceMinMs: min, produceMaxMs: max } = CONFIG.pigpen;
+  return now + min + Math.random() * (max - min);
+}
+
+// Runs every tick. Returns true if something changed (so we save).
+function updatePens(now) {
+  let changed = false;
+  state.tiles.forEach((tile, i) => {
+    if (!tile.building || tile.building.type !== 'pigpen' || tile.building.anchor === i) return;
+    const pig = state.tiles[tile.building.anchor].animal;
+    if (!pig || tile.product) {
+      // No pig, or the last thing was not collected yet: nothing is made.
+      if (tile.produceAt != null) { tile.produceAt = null; changed = true; }
+      return;
+    }
+    if (tile.produceAt == null) { tile.produceAt = nextProduceTime(now); changed = true; return; }
+    if (now >= tile.produceAt) {
+      tile.product = Math.random() < CONFIG.pigpen.babyPigChance ? 'pig' : 'fertilizer';
+      tile.produceAt = null;
+      changed = true;
+    }
+  });
+  return changed;
+}
+
+// Pick up what a pigpen made: it leaves the tile and production starts again.
+function takeProduct(index) {
+  const tile = state.tiles[index];
+  tile.product = null;
+  const pig = state.tiles[tile.building.anchor].animal;
+  tile.produceAt = pig ? nextProduceTime(gameNow()) : null;
+  renderTile(index);
+}
+
+// Put what a pigpen made into Storage.
+function storeProduct(index) {
+  const id = state.tiles[index].product;
+  if (!id) return false;
+  state.storage[id] = (state.storage[id] || 0) + 1;
+  takeProduct(index);
+  renderStorage();
+  showToast(`${itemInfo(id).icon} Stored!`);
+  saveGame();
+  return true;
+}
+
+// Use what a pigpen made straight away on another tile.
+function useProductOn(fromIndex, toIndex) {
+  const id = state.tiles[fromIndex].product;
+  if (!id || fromIndex === toIndex || !canUseItemOn(id, toIndex)) return false;
+  takeProduct(fromIndex);
+  useItemOn(id, toIndex);
+  saveGame();
+  return true;
+}
+
+// Use one item from Storage on a tile.
+function useFromStorage(id, index) {
+  if (!(state.storage[id] > 0) || !canUseItemOn(id, index)) return false;
+  state.storage[id] -= 1;
+  if (state.storage[id] === 0) delete state.storage[id];
+  useItemOn(id, index);
+  renderStorage();
+  saveGame();
+  return true;
+}
+
+// Old saves let pigs stand on either pen tile; now only the first tile holds one.
+// Old saves may also hold Pork (removed): every 5 pork (rounded up) becomes 1 Big Pig.
+function migratePens() {
+  if (state.storage.pork > 0) {
+    state.storage.bigPig = (state.storage.bigPig || 0) + Math.ceil(state.storage.pork / 5);
+  }
+  delete state.storage.pork;
+  delete state.market.prices.pork;
+  delete state.market.change.pork;
+  state.tiles.forEach((tile, i) => {
+    if (!tile.animal || !tile.building || tile.building.anchor === i) return;
+    const anchor = state.tiles[tile.building.anchor];
+    if (!anchor.animal) {
+      anchor.animal = tile.animal;            // move it to the pig tile
+    } else {
+      state.storage[tile.animal.type] = (state.storage[tile.animal.type] || 0) + 1; // keep it as a baby
+    }
+    tile.animal = null;
+  });
+}
+
+/* ---------- Feeding ---------- */
+// Can this food be fed to the animal on this tile? (It must still be growing.)
+function canFeed(foodId, index) {
+  const tile = state.tiles[index];
+  if (!tile || !tile.animal || isGrown(tile)) return false;
+  return CONFIG.animals[tile.animal.type].food === foodId;
+}
+
+// Feed the animal: it grows up earlier. The caller removes the food.
+function feedAnimal(index) {
+  const tile = state.tiles[index];
+  tile.animal.bornAt -= CONFIG.animals[tile.animal.type].feedTimeSavedMs;
+  renderTile(index);
+  showToast(`${CONFIG.animals[tile.animal.type].icon} Yum!`);
+}
+
+// Feed with the ripe crop on another tile (the crop is used up).
+function feedFromField(cropIndex, animalIndex) {
+  const crop = state.tiles[cropIndex];
+  if (!isRipe(crop) || !canFeed(crop.crop.type, animalIndex)) return false;
+  crop.crop = null;
+  renderTile(cropIndex);
+  feedAnimal(animalIndex);
+  saveGame();
+  return true;
+}
+
+// Feed with one item from Storage.
+function feedFromStorage(foodId, animalIndex) {
+  if (!(state.storage[foodId] > 0) || !canFeed(foodId, animalIndex)) return false;
+  state.storage[foodId] -= 1;
+  if (state.storage[foodId] === 0) delete state.storage[foodId];
+  renderStorage();
+  feedAnimal(animalIndex);
+  saveGame();
+  return true;
+}
+
+// While dragging food: green on an animal that can eat it, red on one that can't.
+function highlightFeedTarget(foodId, x, y) {
+  clearDropHighlight();
+  const i = tileIndexAt(x, y);
+  if (i >= 0 && state.tiles[i].animal) {
+    $('field').children[i].classList.add(canFeed(foodId, i) ? 'drop-ok' : 'drop-bad');
+  }
+}
+
+// Like isRipe, worked out from the timestamp.
+function isGrown(tile, now = gameNow()) {
+  if (!tile || !tile.animal) return false;
+  return now - tile.animal.bornAt >= CONFIG.animals[tile.animal.type].growTimeMs;
+}
+
+// New Land works only on a locked tile.
+function canUnlockLand(index) {
+  const tile = state.tiles[index];
+  return !!tile && !tile.unlocked;
+}
+
+// Returns true if the tile was unlocked.
+function unlockLand(index) {
+  const price = CONFIG.newLand.price;
+  if (!canUnlockLand(index)) return false;
+  if (state.coins < price) {
+    showToast('Not enough coins! 🪙');
+    return false;
+  }
+  state.coins -= price;
+  state.tiles[index].unlocked = true;
+  renderCoins();
+  renderTile(index);
+  showToast('🚜 New land is ready!');
+  saveGame();
+  return true;
+}
+
+// Ripeness is worked out from the timestamp, so it is correct even
+// after the page was closed for a while.
+function isRipe(tile, now = gameNow()) {
+  if (!tile || !tile.crop) return false;
+  return now - tile.crop.plantedAt >= CONFIG.crops[tile.crop.type].growTimeMs;
+}
+
+// Add coins for one item at the current Market price.
+function earnFromSale(cropId) {
+  const price = state.market.prices[cropId];
+  state.coins += price;
+  renderCoins();
+  showToast(`Sold for 🪙 ${price}!`);
+}
+
+// Sell the ripe crop on a tile at the current Market price.
+function sellCrop(index) {
+  const tile = state.tiles[index];
+  if (!isRipe(tile)) return false;
+  earnFromSale(tile.crop.type);
+  tile.crop = null;
+  renderTile(index);
+  saveGame();
+  return true;
+}
+
+/* =========================================================
+   STORAGE
+   ========================================================= */
+// Move the ripe crop on a tile into Storage.
+function storeCrop(index) {
+  const tile = state.tiles[index];
+  if (!isRipe(tile)) return false;
+  const type = tile.crop.type;
+  state.storage[type] = (state.storage[type] || 0) + 1;
+  tile.crop = null;
+  renderTile(index);
+  renderStorage();
+  showToast(`${CONFIG.crops[type].ripeIcon} Stored!`);
+  saveGame();
+  return true;
+}
+
+// Move a big animal into Storage (it is kept as goods, e.g. a Big Pig).
+function storeAnimal(index) {
+  const tile = state.tiles[index];
+  if (!isGrown(tile)) return false;
+  const id = CONFIG.animals[tile.animal.type].grownGoods;
+  state.storage[id] = (state.storage[id] || 0) + 1;
+  tile.animal = null;
+  renderTile(index);
+  renderStorage();
+  showToast(`${goodsInfo(id).icon} Stored!`);
+  saveGame();
+  return true;
+}
+
+// Sell a big animal straight from its pen at the current Market price.
+function sellAnimal(index) {
+  const tile = state.tiles[index];
+  if (!isGrown(tile)) return false;
+  earnFromSale(CONFIG.animals[tile.animal.type].grownGoods);
+  tile.animal = null;
+  renderTile(index);
+  saveGame();
+  return true;
+}
+
+// Sell one stored item at the current Market price.
+function sellFromStorage(cropId) {
+  if (!(state.storage[cropId] > 0)) return false;
+  state.storage[cropId] -= 1;
+  if (state.storage[cropId] === 0) delete state.storage[cropId];
+  earnFromSale(cropId);
+  renderStorage();
+  saveGame();
+  return true;
+}
+
+/* =========================================================
+   BUILDING
+   ========================================================= */
+// Neighbour of a tile in a direction, or -1 if it is off the field.
+function neighbourIndex(index, dCol, dRow) {
+  const { col, row } = state.tiles[index];
+  const c = col + dCol, r = row + dRow;
+  if (c < 0 || c >= CONFIG.fieldColumns || r < 0 || r >= CONFIG.fieldRows) return -1;
+  return r * CONFIG.fieldColumns + c;
+}
+
+// The tiles a building would use if dropped on `index`, or null if it does not fit.
+// A 2-tile building tries the tile to the right, then left, then below, then above.
+function findBuildSpot(type, index) {
+  if (!canPlantOn(index)) return null;
+  if (CONFIG.buildings[type].size === 1) return [index];
+  const dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+  for (const [dc, dr] of dirs) {
+    const n = neighbourIndex(index, dc, dr);
+    if (n >= 0 && canPlantOn(n)) return [index, n].sort((a, b) => a - b);
+  }
+  return null;
+}
+
+// Returns true if building worked.
+function placeBuilding(type, index) {
+  const spot = findBuildSpot(type, index);
+  if (!spot) return false;
+  const b = CONFIG.buildings[type];
+  if (state.coins < b.cost) {
+    showToast('Not enough coins! 🪙');
+    return false;
+  }
+  state.coins -= b.cost;
+  spot.forEach(i => { state.tiles[i].building = { type, anchor: spot[0] }; });
+  renderCoins();
+  spot.forEach(renderTile);
+  showToast(`${b.icon} ${b.name} built!`);
+  saveGame();
+  return true;
+}
+
+/* =========================================================
+   MARKET PRICES
+   ========================================================= */
+function randomPrice(base) {
+  const swing = CONFIG.market.priceSwing;
+  const factor = 1 + (Math.random() * 2 - 1) * swing;   // 0.7 .. 1.3
+  return Math.max(1, Math.round(base * factor));
+}
+
+// Change prices if one or more update periods have passed.
+// Returns true if prices changed.
+function updatePrices(now) {
+  const m = state.market;
+  const every = CONFIG.market.priceUpdateMs;
+  if (now - m.lastUpdate < every) return false;
+  // Only one change, even if the page was closed for many periods.
+  m.lastUpdate = now - ((now - m.lastUpdate) % every);
+  goodsList().forEach(([id, g]) => {
+    const old = m.prices[id];
+    m.prices[id] = randomPrice(g.basePrice);
+    m.change[id] = Math.sign(m.prices[id] - old);
+  });
+  return true;
+}
+
+/* =========================================================
+   GAME LOOP — runs every CONFIG.tickMs
+   ========================================================= */
+function tick() {
+  const now = gameNow();
+
+  // Crops: redraw tiles (renderTile only touches the DOM if the icon changed)
+  // and unlock the Market when the first crop is ripe.
+  let anyRipe = false;
+  state.tiles.forEach((tile, i) => {
+    renderTile(i);
+    if (isRipe(tile, now)) anyRipe = true;
+  });
+  if (anyRipe && !state.tools.market) {
+    state.tools.market = true;
+    renderToolbar();
+    showToast('💰 The Market is open!');
+    saveGame();
+  }
+
+  if (updatePrices(now)) {
+    renderMarket();
+    saveGame();
+  }
+
+  // Pigpens: make Fertilizer / Baby Pigs, then redraw.
+  if (updatePens(now)) {
+    state.tiles.forEach((t, i) => renderTile(i));
+    saveGame();
+  }
+}
+
+/* =========================================================
+   WINDOWS (open, close, drag by title bar)
+   ========================================================= */
+// Keep a window fully inside the screen.
+function placeWindow(win, x, y) {
+  const maxX = window.innerWidth - win.offsetWidth;
+  const maxY = window.innerHeight - win.offsetHeight;
+  win.style.left = Math.max(0, Math.min(x, maxX)) + 'px';
+  win.style.top = Math.max(0, Math.min(y, maxY)) + 'px';
+}
+
+// The most recently opened or touched window is drawn on top.
+let topZ = 10;
+function bringToFront(win) {
+  win.style.zIndex = ++topZ;
+}
+
+// side: 'right' or 'left', y: top position — where the window first appears.
+function openWindow(win, side = 'right', y = 80) {
+  const firstTime = !win.style.left;
+  win.classList.add('open');
+  bringToFront(win);
+  if (firstTime) {
+    const x = side === 'left' ? 16 : window.innerWidth - win.offsetWidth - 16;
+    placeWindow(win, x, y);
+  } else {
+    placeWindow(win, win.offsetLeft, win.offsetTop);
+  }
+}
+
+function closeWindow(win) {
+  win.classList.remove('open');
+}
+
+function makeWindowDraggable(win) {
+  win.addEventListener('pointerdown', () => bringToFront(win));
+  const handle = win.querySelector('.window-title');
+  handle.addEventListener('pointerdown', e => {
+    if (e.target.closest('.window-close')) return;   // let the close button work
+    e.preventDefault();
+    const offsetX = e.clientX - win.offsetLeft;
+    const offsetY = e.clientY - win.offsetTop;
+    handle.setPointerCapture(e.pointerId);
+
+    const onMove = ev => placeWindow(win, ev.clientX - offsetX, ev.clientY - offsetY);
+    const onUp = () => {
+      handle.removeEventListener('pointermove', onMove);
+      handle.removeEventListener('pointerup', onUp);
+      handle.removeEventListener('pointercancel', onUp);
+    };
+    handle.addEventListener('pointermove', onMove);
+    handle.addEventListener('pointerup', onUp);
+    handle.addEventListener('pointercancel', onUp);
+  });
+}
+
+/* =========================================================
+   DRAG HELPER — an icon follows the pointer; if the drop
+   fails it snaps back to where it came from.
+   ========================================================= */
+// sourceEl: element the drag started on (gets the pointer capture)
+// icon:     emoji to show while dragging
+// handlers: { over(x, y), end(), drop(x, y) -> true if the drop worked }
+function startIconDrag(e, sourceEl, icon, handlers) {
+  e.preventDefault();
+  const r = sourceEl.getBoundingClientRect();
+  const homeX = r.left + r.width / 2;    // where to snap back to
+  const homeY = r.top + r.height / 2;
+
+  const ghost = document.createElement('div');
+  ghost.className = 'drag-ghost';
+  ghost.textContent = icon;
+  document.body.appendChild(ghost);
+  const moveGhost = (x, y) => { ghost.style.left = x + 'px'; ghost.style.top = y + 'px'; };
+  moveGhost(e.clientX, e.clientY);
+
+  sourceEl.setPointerCapture(e.pointerId);
+
+  const onMove = ev => {
+    moveGhost(ev.clientX, ev.clientY);
+    if (handlers.over) handlers.over(ev.clientX, ev.clientY);
+  };
+  const finish = (ev, cancelled) => {
+    sourceEl.removeEventListener('pointermove', onMove);
+    sourceEl.removeEventListener('pointerup', onUp);
+    sourceEl.removeEventListener('pointercancel', onCancel);
+    if (handlers.end) handlers.end();
+    if (!cancelled && handlers.drop(ev.clientX, ev.clientY)) {
+      ghost.remove();
+    } else {
+      ghost.classList.add('snap-back');
+      moveGhost(homeX, homeY);
+      setTimeout(() => ghost.remove(), 260);
+    }
+  };
+  const onUp = ev => finish(ev, false);
+  const onCancel = ev => finish(ev, true);
+
+  sourceEl.addEventListener('pointermove', onMove);
+  sourceEl.addEventListener('pointerup', onUp);
+  sourceEl.addEventListener('pointercancel', onCancel);
+}
+
+// Find the field tile under a screen point, or -1.
+function tileIndexAt(x, y) {
+  const el = document.elementFromPoint(x, y);
+  const tileEl = el && el.closest('#field .tile');
+  return tileEl ? Number(tileEl.dataset.index) : -1;
+}
+
+// Is a screen point over an open window? (e.g. isOverWindow('market-window', x, y))
+function isOverWindow(id, x, y) {
+  const el = document.elementFromPoint(x, y);
+  return !!(el && el.closest(`#${id}.open`));
+}
+const isOverMarket  = (x, y) => isOverWindow('market-window', x, y);
+const isOverStorage = (x, y) => isOverWindow('storage-window', x, y);
+
+function clearDropHighlight() {
+  document.querySelectorAll('.tile.drop-ok, .tile.drop-bad')
+    .forEach(el => el.classList.remove('drop-ok', 'drop-bad'));
+}
+
+/* ---------- Seed: Shop → field ---------- */
+function startSeedDrag(item, e) {
+  const cropId = item.dataset.crop;
+  startIconDrag(e, item, CONFIG.crops[cropId].icon, {
+    over(x, y) {
+      clearDropHighlight();
+      const i = tileIndexAt(x, y);
+      if (i >= 0) $('field').children[i].classList.add(canPlantOn(i) ? 'drop-ok' : 'drop-bad');
+    },
+    end: clearDropHighlight,
+    drop(x, y) {
+      const i = tileIndexAt(x, y);
+      return i >= 0 && plantSeed(cropId, i);
+    },
+  });
+}
+
+/* ---------- Shop item used on one tile (Fertilizer, New Land) ---------- */
+// canUse(index) -> may it be dropped there?  use(index) -> true if it worked.
+function startTileItemDrag(item, e, icon, canUse, use) {
+  startIconDrag(e, item, icon, {
+    over(x, y) {
+      clearDropHighlight();
+      const i = tileIndexAt(x, y);
+      if (i >= 0) $('field').children[i].classList.add(canUse(i) ? 'drop-ok' : 'drop-bad');
+    },
+    end: clearDropHighlight,
+    drop(x, y) {
+      const i = tileIndexAt(x, y);
+      return i >= 0 && use(i);
+    },
+  });
+}
+
+/* ---------- Building: Build window → empty tile(s) ---------- */
+function startBuildDrag(item, e) {
+  const type = item.dataset.building;
+  startIconDrag(e, item, CONFIG.buildings[type].icon, {
+    over(x, y) {
+      clearDropHighlight();
+      const i = tileIndexAt(x, y);
+      if (i < 0) return;
+      const spot = findBuildSpot(type, i);
+      if (spot) spot.forEach(t => $('field').children[t].classList.add('drop-ok'));
+      else $('field').children[i].classList.add('drop-bad');
+    },
+    end: clearDropHighlight,
+    drop(x, y) {
+      const i = tileIndexAt(x, y);
+      return i >= 0 && placeBuilding(type, i);
+    },
+  });
+}
+
+/* ---------- Ripe crop: field → Market (sell) or Storage (keep) ---------- */
+function startHarvestDrag(tileEl, e) {
+  const index = Number(tileEl.dataset.index);
+  const tile = state.tiles[index];
+  if (!isRipe(tile)) return;
+  const market = $('market-window'), storage = $('storage-window');
+  const cropId = tile.crop.type;
+  tileEl.style.opacity = '0.35';       // show the crop is "lifted"
+  startIconDrag(e, tileEl, CONFIG.crops[cropId].ripeIcon, {
+    over(x, y) {
+      market.classList.toggle('drop-target', isOverMarket(x, y));
+      storage.classList.toggle('drop-target', isOverStorage(x, y));
+      highlightFeedTarget(cropId, x, y);
+    },
+    end() {
+      tileEl.style.opacity = '';
+      market.classList.remove('drop-target');
+      storage.classList.remove('drop-target');
+      clearDropHighlight();
+    },
+    drop(x, y) {
+      if (isOverMarket(x, y)) return sellCrop(index);
+      if (isOverStorage(x, y)) return storeCrop(index);
+      const i = tileIndexAt(x, y);
+      return i >= 0 && feedFromField(index, i);   // feed a growing animal
+    },
+  });
+}
+
+/* ---------- Big animal: pen → Market (sell) or Storage (keep) ---------- */
+function startAnimalDrag(tileEl, e) {
+  const index = Number(tileEl.dataset.index);
+  const tile = state.tiles[index];
+  if (!isGrown(tile)) return;
+  const market = $('market-window'), storage = $('storage-window');
+  tileEl.style.opacity = '0.35';
+  startIconDrag(e, tileEl, CONFIG.animals[tile.animal.type].grownIcon, {
+    over(x, y) {
+      market.classList.toggle('drop-target', isOverMarket(x, y));
+      storage.classList.toggle('drop-target', isOverStorage(x, y));
+    },
+    end() {
+      tileEl.style.opacity = '';
+      market.classList.remove('drop-target');
+      storage.classList.remove('drop-target');
+    },
+    drop(x, y) {
+      if (isOverMarket(x, y)) return sellAnimal(index);
+      if (isOverStorage(x, y)) return storeAnimal(index);
+      return false;
+    },
+  });
+}
+
+/* ---------- Pigpen product: pen → Storage, or straight onto a tile ---------- */
+// Fertilizer → a growing crop.  Baby Pig → an empty pigpen.
+function startProductDrag(tileEl, e) {
+  const index = Number(tileEl.dataset.index);
+  const id = state.tiles[index].product;
+  if (!id) return;
+  const storage = $('storage-window');
+  tileEl.style.opacity = '0.35';
+  startIconDrag(e, tileEl, itemInfo(id).icon, {
+    over(x, y) {
+      clearDropHighlight();
+      const onStorage = isOverStorage(x, y);
+      storage.classList.toggle('drop-target', onStorage);
+      const i = tileIndexAt(x, y);
+      if (!onStorage && i >= 0 && i !== index) {
+        $('field').children[i].classList.add(canUseItemOn(id, i) ? 'drop-ok' : 'drop-bad');
+      }
+    },
+    end() {
+      tileEl.style.opacity = '';
+      clearDropHighlight();
+      storage.classList.remove('drop-target');
+    },
+    drop(x, y) {
+      if (isOverStorage(x, y)) return storeProduct(index);
+      const i = tileIndexAt(x, y);
+      return i >= 0 && useProductOn(index, i);
+    },
+  });
+}
+
+/* ---------- Stored things: Storage → Market (goods) or → a tile (Fertilizer, Baby Pig) ---------- */
+function startStorageDrag(row, e) {
+  const id = row.dataset.goods;
+  if (goodsInfo(id)) {
+    const market = $('market-window');
+    startIconDrag(e, row, goodsInfo(id).icon, {
+      over(x, y) {
+        market.classList.toggle('drop-target', isOverMarket(x, y));
+        highlightFeedTarget(id, x, y);
+      },
+      end() {
+        market.classList.remove('drop-target');
+        clearDropHighlight();
+      },
+      drop(x, y) {
+        if (isOverMarket(x, y)) return sellFromStorage(id);
+        const i = tileIndexAt(x, y);
+        return i >= 0 && feedFromStorage(id, i);   // feed a growing animal
+      },
+    });
+  } else {
+    startTileItemDrag(row, e, itemInfo(id).icon,
+      i => canUseItemOn(id, i), i => useFromStorage(id, i));
+  }
+}
+
+/* =========================================================
+   INPUT
+   ========================================================= */
+function onToolClick(toolId) {
+  if (!state.tools[toolId]) return;
+  if (toolId === 'shop') openWindow($('shop-window'), 'right');
+  if (toolId === 'market') openWindow($('market-window'), 'left');
+  if (toolId === 'build') openWindow($('build-window'), 'right', 330);
+  if (toolId === 'storage') openWindow($('storage-window'), 'left', 280);
+}
+
+function setupInput() {
+  // Shop window: drag by title, close button, drag seeds out of it.
+  const shop = $('shop-window');
+  makeWindowDraggable(shop);
+  $('shop-close').addEventListener('click', () => closeWindow(shop));
+  $('shop-items').addEventListener('pointerdown', e => {
+    const item = e.target.closest('.shop-item');
+    if (!item) return;
+    if (item.dataset.crop) startSeedDrag(item, e);
+    else if (item.dataset.animal) {
+      const type = item.dataset.animal;
+      startTileItemDrag(item, e, CONFIG.animals[type].icon,
+        i => canPlaceAnimal(type, i), i => placeAnimal(type, i));
+    }
+    else if (item.dataset.item === 'fertilizer')
+      startTileItemDrag(item, e, CONFIG.fertilizer.icon, canFertilize, useFertilizer);
+    else if (item.dataset.item === 'newLand')
+      startTileItemDrag(item, e, CONFIG.newLand.icon, canUnlockLand, unlockLand);
+  });
+
+  // Market window: drag by title, close button.
+  const market = $('market-window');
+  makeWindowDraggable(market);
+  $('market-close').addEventListener('click', () => closeWindow(market));
+
+  // Build window: drag by title, close button, drag buildings out of it.
+  const build = $('build-window');
+  makeWindowDraggable(build);
+  $('build-close').addEventListener('click', () => closeWindow(build));
+  $('build-items').addEventListener('pointerdown', e => {
+    const item = e.target.closest('.shop-item');
+    if (item) startBuildDrag(item, e);
+  });
+
+  // Storage window: drag by title, close button, drag goods out to the Market.
+  const storage = $('storage-window');
+  makeWindowDraggable(storage);
+  $('storage-close').addEventListener('click', () => closeWindow(storage));
+  $('storage-items').addEventListener('pointerdown', e => {
+    const row = e.target.closest('.storage-row');
+    if (row) startStorageDrag(row, e);
+  });
+
+  // Field: drag ripe crops (to the Market or Storage) and big animals (to Storage).
+  $('field').addEventListener('pointerdown', e => {
+    const tileEl = e.target.closest('.tile');
+    if (!tileEl) return;
+    const tile = state.tiles[Number(tileEl.dataset.index)];
+    if (tile.animal) startAnimalDrag(tileEl, e);
+    else if (tile.product) startProductDrag(tileEl, e);
+    else startHarvestDrag(tileEl, e);
+  });
+
+  window.addEventListener('resize', () => {
+    [shop, market, build, storage].forEach(win => {
+      if (win.classList.contains('open')) placeWindow(win, win.offsetLeft, win.offsetTop);
+    });
+  });
+
+  // Footer buttons (pointer events work for mouse and touch).
+  $('toolbar').addEventListener('pointerup', e => {
+    const btn = e.target.closest('.tool-btn');
+    if (btn && !btn.disabled) onToolClick(btn.dataset.tool);
+  });
+
+  // Debug fast mode.
+  document.addEventListener('keydown', e => {
+    if (e.key.toLowerCase() === CONFIG.debugKey) toggleDebug();
+  });
+
+  // Save when the page is hidden or closed.
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) { gameNow(); saveGame(); }
+  });
+  window.addEventListener('pagehide', () => { gameNow(); saveGame(); });
+}
+
+/* =========================================================
+   START
+   ========================================================= */
+function init() {
+  state = loadGame() || newGameState();
+  migratePens();
+  renderAll();
+  setupInput();
+  tick();
+  saveGame();
+  setInterval(tick, CONFIG.tickMs);
+  setInterval(() => { gameNow(); saveGame(); }, CONFIG.saveEveryMs);
+}
+
+init();
+</script>
+</body>
+</html>
