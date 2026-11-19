@@ -34,15 +34,23 @@
 </div>
 
 <!-- Market window -->
-<div class="window" id="market-window">
+<div class="window market-window" id="market-window">
   <div class="window-title">
     <span>💰 Market</span>
     <button class="window-close" id="market-close" aria-label="Close">✖</button>
   </div>
   <div class="window-body">
-    <div class="market-head"><span>We buy</span><span>Price</span></div>
+    <!-- Drop zone: the whole window accepts drops, this box explains it -->
+    <div class="sell-zone" id="sell-zone">
+      <div class="sell-zone-icon" id="sell-zone-icon">🧺</div>
+      <div class="sell-zone-text">
+        <div class="sell-zone-main" id="sell-zone-main">Drag goods here to sell</div>
+        <div class="sell-zone-sub" id="sell-zone-sub">From your field or Storage</div>
+      </div>
+    </div>
+    <div class="market-head"><span>Item</span><span>Today's price</span></div>
     <div id="market-items"></div>
-    <div class="shop-hint">Drag ripe crops here to sell!</div>
+    <div class="market-timer">⏱️ New prices in <b id="market-timer">0:30</b></div>
   </div>
 </div>
 

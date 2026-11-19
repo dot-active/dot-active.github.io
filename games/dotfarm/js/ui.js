@@ -180,18 +180,18 @@ function startHarvestDrag(tileEl, e) {
   const index = Number(tileEl.dataset.index);
   const tile = state.tiles[index];
   if (!isRipe(tile)) return;
-  const market = $('market-window'), storage = $('storage-window');
+  const storage = $('storage-window');
   const cropId = tile.crop.type;
   tileEl.style.opacity = '0.35';       // show the crop is "lifted"
   startIconDrag(e, tileEl, CONFIG.crops[cropId].ripeIcon, {
     over(x, y) {
-      market.classList.toggle('drop-target', isOverMarket(x, y));
+      setMarketHover(cropId, isOverMarket(x, y));
       storage.classList.toggle('drop-target', isOverStorage(x, y));
       highlightFeedTarget(cropId, x, y);
     },
     end() {
       tileEl.style.opacity = '';
-      market.classList.remove('drop-target');
+      setMarketHover(null, false);
       storage.classList.remove('drop-target');
       clearDropHighlight();
     },
@@ -209,16 +209,17 @@ function startAnimalDrag(tileEl, e) {
   const index = Number(tileEl.dataset.index);
   const tile = state.tiles[index];
   if (!isGrown(tile)) return;
-  const market = $('market-window'), storage = $('storage-window');
+  const storage = $('storage-window');
   tileEl.style.opacity = '0.35';
+  const goodsId = CONFIG.animals[tile.animal.type].grownGoods;
   startIconDrag(e, tileEl, CONFIG.animals[tile.animal.type].grownIcon, {
     over(x, y) {
-      market.classList.toggle('drop-target', isOverMarket(x, y));
+      setMarketHover(goodsId, isOverMarket(x, y));
       storage.classList.toggle('drop-target', isOverStorage(x, y));
     },
     end() {
       tileEl.style.opacity = '';
-      market.classList.remove('drop-target');
+      setMarketHover(null, false);
       storage.classList.remove('drop-target');
     },
     drop(x, y) {
@@ -264,14 +265,13 @@ function startProductDrag(tileEl, e) {
 function startStorageDrag(row, e) {
   const id = row.dataset.goods;
   if (goodsInfo(id)) {
-    const market = $('market-window');
     startIconDrag(e, row, goodsInfo(id).icon, {
       over(x, y) {
-        market.classList.toggle('drop-target', isOverMarket(x, y));
+        setMarketHover(id, isOverMarket(x, y));
         highlightFeedTarget(id, x, y);
       },
       end() {
-        market.classList.remove('drop-target');
+        setMarketHover(null, false);
         clearDropHighlight();
       },
       drop(x, y) {

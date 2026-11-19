@@ -93,15 +93,60 @@ function renderMarket() {
     const arrow = dir > 0 ? '<span class="arrow up">↑</span>'
                 : dir < 0 ? '<span class="arrow down">↓</span>'
                 : '<span class="arrow">–</span>';
+    const price = state.market.prices[id];
+    // Compare with the usual price, so players can tell a good moment to sell.
+    const tag = price >= g.basePrice * 1.1 ? '<span class="tag high">HIGH</span>'
+              : price <= g.basePrice * 0.9 ? '<span class="tag low">LOW</span>' : '';
     const row = document.createElement('div');
     row.className = 'market-row';
+    row.dataset.goods = id;
     row.innerHTML = `
       <span class="icon">${g.icon}</span>
-      <span class="name">${g.name}</span>
-      <span class="price">🪙 ${state.market.prices[id]}</span>
+      <div class="info">
+        <div class="name">${g.name}${tag}</div>
+        <div class="avg">Usually 🪙 ${g.basePrice}</div>
+      </div>
+      <span class="price">🪙 ${price}</span>
       ${arrow}`;
     list.appendChild(row);
   });
+  renderMarketTimer();
+}
+
+// "New prices in 0:21"
+function renderMarketTimer() {
+  const left = state.market.lastUpdate + CONFIG.market.priceUpdateMs - gameNow();
+  const text = formatTime(left);
+  if ($('market-timer').textContent !== text) $('market-timer').textContent = text;
+}
+
+/* ---------- Market drop zone feedback ---------- */
+// While a sellable thing (goodsId) is dragged: the Market invites the drop;
+// over the Market it says what you'll get. goodsId = null ends it.
+function setMarketHover(goodsId, over) {
+  const win = $('market-window');
+  win.classList.toggle('armed', !!goodsId);
+  win.classList.toggle('drop-target', !!goodsId && over);
+  document.querySelectorAll('#market-items .market-row').forEach(r =>
+    r.classList.toggle('active', !!goodsId && r.dataset.goods === goodsId));
+  if (win.classList.contains('sold')) return;   // let the "Sold!" message show
+  const g = goodsId && goodsInfo(goodsId);
+  $('sell-zone-icon').textContent = g ? g.icon : '🧺';
+  $('sell-zone-main').textContent = !g ? 'Drag goods here to sell'
+    : over ? `Let go to sell for 🪙 ${state.market.prices[goodsId]}` : `Drop ${g.name} here to sell`;
+  $('sell-zone-sub').textContent = g ? `Today's price: 🪙 ${state.market.prices[goodsId]}` : 'From your field or Storage';
+}
+
+// Brief "Sold!" message in the drop zone.
+let soldTimer = null;
+function flashMarketSale(goodsId, price) {
+  const win = $('market-window');
+  win.classList.add('sold');
+  $('sell-zone-icon').textContent = '🪙';
+  $('sell-zone-main').textContent = `Sold ${goodsInfo(goodsId).name} for 🪙 ${price}!`;
+  $('sell-zone-sub').textContent = 'Drag more goods here to sell';
+  clearTimeout(soldTimer);
+  soldTimer = setTimeout(() => { win.classList.remove('sold'); setMarketHover(null, false); }, 1200);
 }
 
 function renderShop() {

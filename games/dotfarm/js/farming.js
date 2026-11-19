@@ -280,6 +280,7 @@ function earnFromSale(cropId) {
   state.coins += price;
   renderCoins();
   showToast(`Sold for 🪙 ${price}!`);
+  flashMarketSale(cropId, price);
 }
 
 // Sell the ripe crop on a tile at the current Market price.
@@ -512,6 +513,7 @@ function tick() {
     renderMarket();
     saveGame();
   }
+  renderMarketTimer();
 
   // Pigpens: make Fertilizer / Baby Pigs, then redraw.
   if (updatePens(now)) {
