@@ -438,7 +438,7 @@ function removeBuildingBlocker(index) {
   }
   if (b.type === 'warehouse') {
     const free = storageCapacity() - storageSlotsUsed();
-    const need = CONFIG.storage.freeSlotsToRemove;
+    const need = CONFIG.storage.slotsPerWarehouse;
     if (free < need) return `Storage needs ${need} empty slots first! 📦`;
   }
   return '';

@@ -163,7 +163,7 @@ function renderStorage() {
     const slot = document.createElement('div');
     slot.className = 'slot-locked';
     slot.textContent = '🔒';
-    slot.title = 'Build a Warehouse to unlock 5 more slots';
+    slot.title = `Build a Warehouse to unlock ${CONFIG.storage.slotsPerWarehouse} more slots`;
     list.appendChild(slot);
   }
   const used = storageSlotsUsed();

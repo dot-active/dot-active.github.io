@@ -94,10 +94,10 @@ const CONFIG = {
 
   // --- Storage (needs Warehouses) ---
   storage: {
-    slotsPerWarehouse: 5,  // each Warehouse built adds this many Storage slots
+    slotsPerWarehouse: 4,  // each Warehouse built adds this many Storage slots
     stackSize: 10,         // how many of the same thing fit in one slot (1 = every item takes its own slot)
     minShownSlots: 20,     // the Storage window always shows at least this many slots (locked ones are grey)
-    freeSlotsToRemove: 5,  // a Warehouse can be removed only if at least this many slots are empty
+    // A Warehouse can be removed only if at least slotsPerWarehouse slots are empty (so everything still fits).
   },
 
   // --- Market ---
