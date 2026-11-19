@@ -283,6 +283,15 @@ footer {
   text-align: center;
 }
 .slot-empty { border: 3px dashed #e3cfa6; }
+.slot-locked {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #d6d0c4;
+  box-shadow: inset 0 0 0 3px #c2b9a8;
+  font-size: 20px;
+  opacity: .6;
+}
 .shop-item .icon  { font-size: 34px; line-height: 1; }
 .shop-item .name,
 .shop-item .price {
@@ -349,6 +358,56 @@ footer {
 .market-row .arrow { width: 18px; text-align: center; font-size: 20px; font-weight: 900; color: #9e9e9e; }
 .market-row .arrow.up   { color: #2e7d32; }
 .market-row .arrow.down { color: #c62828; }
+
+/* ---------- Tile menu (Collect / Sell / Remove) ---------- */
+.tile.selected { outline: 4px solid #ffd54f; outline-offset: -4px; }
+.tile-menu {
+  position: fixed;
+  z-index: 999999;
+  display: none;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  background: #fff8e7;
+  border-radius: 14px;
+  box-shadow: 0 8px 24px rgba(0,0,0,.35);
+  min-width: 150px;
+}
+.tile-menu.open { display: flex; }
+.tile-menu .menu-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 16px;
+  font-weight: 800;
+  color: #4a2e12;
+  padding: 0 2px;
+}
+.tile-menu .menu-title .icon { font-size: 24px; line-height: 1; }
+.tile-menu button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border: none;
+  border-radius: 10px;
+  background: #f4d9a6;
+  color: #4a2e12;
+  font: inherit;
+  font-size: 16px;
+  font-weight: 800;
+  text-align: left;
+  cursor: pointer;
+  box-shadow: 0 3px 0 #b88a52;
+}
+.tile-menu button:active:not(.off) { transform: translateY(2px); box-shadow: 0 1px 0 #b88a52; }
+.tile-menu button.remove { background: #ffcdd2; box-shadow: 0 3px 0 #c62828; }
+.tile-menu button.off {
+  background: #e0e0e0;
+  color: #9e9e9e;
+  box-shadow: 0 3px 0 #bdbdbd;
+  cursor: not-allowed;
+}
 
 /* The item that follows the finger/mouse while dragging */
 .drag-ghost {
@@ -423,9 +482,11 @@ footer {
   </div>
   <div class="window-body">
     <div class="slot-grid" id="storage-items"></div>
-    <div class="shop-hint">Drag things here to keep them.<br>Drag them out to sell or use them!</div>
+    <div class="shop-hint" id="storage-hint"></div>
   </div>
 </div>
+
+<div class="tile-menu" id="tile-menu"></div>
 
 <div class="toast" id="toast"></div>
 
@@ -522,6 +583,14 @@ const CONFIG = {
       cost: 30,
       size: 1,
     },
+  },
+
+  // --- Storage (needs Warehouses) ---
+  storage: {
+    slotsPerWarehouse: 5,  // each Warehouse built adds this many Storage slots
+    stackSize: 10,         // how many of the same thing fit in one slot (1 = every item takes its own slot)
+    minShownSlots: 20,     // the Storage window always shows at least this many slots (locked ones are grey)
+    freeSlotsToRemove: 5,  // a Warehouse can be removed only if at least this many slots are empty
   },
 
   // --- Market ---
@@ -828,10 +897,9 @@ function renderBuild() {
 function renderStorage() {
   const list = $('storage-items');
   list.innerHTML = '';
-  const goods = Object.entries(state.storage).filter(([, n]) => n > 0);
-  goods.forEach(([id, count]) => {
+  // One slot per stack: 23 corn with stackSize 10 → slots of 10, 10, 3.
+  storageStacks().forEach(([id, count]) => {
     const g = itemInfo(id);
-    if (!g) return;
     const row = document.createElement('div');
     row.className = 'shop-item storage-row';
     row.dataset.goods = id;
@@ -842,7 +910,25 @@ function renderStorage() {
       <span class="name">${g.name}</span>`;
     list.appendChild(row);
   });
-  fillEmptySlots(list);
+  // Usable empty slots, then locked (grey) ones up to a full row of 4.
+  const cap = storageCapacity();
+  for (let n = list.children.length; n < cap; n++) {
+    const slot = document.createElement('div');
+    slot.className = 'slot-empty';
+    list.appendChild(slot);
+  }
+  const shown = Math.max(CONFIG.storage.minShownSlots, Math.ceil(list.children.length / 4) * 4);
+  for (let n = list.children.length; n < shown; n++) {
+    const slot = document.createElement('div');
+    slot.className = 'slot-locked';
+    slot.textContent = '🔒';
+    slot.title = 'Build a Warehouse to unlock 5 more slots';
+    list.appendChild(slot);
+  }
+  const used = storageSlotsUsed();
+  $('storage-hint').innerHTML = cap === 0
+    ? `Build a ${CONFIG.buildings.warehouse.icon} Warehouse to use Storage!`
+    : `${used} / ${cap} slots used · each Warehouse adds ${CONFIG.storage.slotsPerWarehouse}<br>Drag things out to sell or use them!`;
 }
 
 // Pad a slot grid with empty slots so it always shows at least 4 x 5 = 20.
@@ -1043,7 +1129,7 @@ function takeProduct(index) {
 // Put what a pigpen made into Storage.
 function storeProduct(index) {
   const id = state.tiles[index].product;
-  if (!id) return false;
+  if (!id || !roomInStorage(id)) return false;
   state.storage[id] = (state.storage[id] || 0) + 1;
   takeProduct(index);
   renderStorage();
@@ -1199,11 +1285,48 @@ function sellCrop(index) {
 /* =========================================================
    STORAGE
    ========================================================= */
+// Number of Warehouses on the field (a building is counted once, on its anchor tile).
+function warehouseCount() {
+  return state.tiles.filter((t, i) => t.building && t.building.type === 'warehouse' && t.building.anchor === i).length;
+}
+function storageCapacity() {
+  return warehouseCount() * CONFIG.storage.slotsPerWarehouse;
+}
+// Slots the stored things take: each kind fills ceil(count / stackSize) slots.
+function storageSlotsUsed(storage = state.storage) {
+  return Object.values(storage).reduce((sum, n) => sum + (n > 0 ? Math.ceil(n / CONFIG.storage.stackSize) : 0), 0);
+}
+// [[id, countInThisSlot], ...] — one entry per slot.
+function storageStacks() {
+  const stacks = [];
+  Object.entries(state.storage).forEach(([id, n]) => {
+    if (!(n > 0) || !itemInfo(id)) return;
+    for (let left = n; left > 0; left -= CONFIG.storage.stackSize) {
+      stacks.push([id, Math.min(left, CONFIG.storage.stackSize)]);
+    }
+  });
+  return stacks;
+}
+// Is there room for one more `id`? Shows a toast if not.
+function roomInStorage(id) {
+  if (storageCapacity() === 0) {
+    showToast(`Build a Warehouse first! ${CONFIG.buildings.warehouse.icon}`);
+    return false;
+  }
+  const after = { ...state.storage, [id]: (state.storage[id] || 0) + 1 };
+  if (storageSlotsUsed(after) > storageCapacity()) {
+    showToast('Storage is full! 📦');
+    return false;
+  }
+  return true;
+}
+
 // Move the ripe crop on a tile into Storage.
 function storeCrop(index) {
   const tile = state.tiles[index];
   if (!isRipe(tile)) return false;
   const type = tile.crop.type;
+  if (!roomInStorage(type)) return false;
   state.storage[type] = (state.storage[type] || 0) + 1;
   tile.crop = null;
   renderTile(index);
@@ -1218,6 +1341,7 @@ function storeAnimal(index) {
   const tile = state.tiles[index];
   if (!isGrown(tile)) return false;
   const id = CONFIG.animals[tile.animal.type].grownGoods;
+  if (!roomInStorage(id)) return false;
   state.storage[id] = (state.storage[id] || 0) + 1;
   tile.animal = null;
   renderTile(index);
@@ -1286,7 +1410,44 @@ function placeBuilding(type, index) {
   spot.forEach(i => { state.tiles[i].building = { type, anchor: spot[0] }; });
   renderCoins();
   spot.forEach(renderTile);
+  if (type === 'warehouse') renderStorage();
   showToast(`${b.icon} ${b.name} built!`);
+  saveGame();
+  return true;
+}
+
+// Why a building can't be removed right now, or '' if it can.
+function removeBuildingBlocker(index) {
+  const b = state.tiles[index].building;
+  if (b.type === 'pigpen') {
+    const p = partnerIndex(b.anchor);
+    if (state.tiles[b.anchor].animal || (p >= 0 && state.tiles[p].product)) {
+      return 'Empty the Pigpen first! 🐷';
+    }
+  }
+  if (b.type === 'warehouse') {
+    const free = storageCapacity() - storageSlotsUsed();
+    const need = CONFIG.storage.freeSlotsToRemove;
+    if (free < need) return `Storage needs ${need} empty slots first! 📦`;
+  }
+  return '';
+}
+
+// Remove a building (all its tiles). No refund.
+function removeBuilding(index) {
+  const b = state.tiles[index].building;
+  if (!b || removeBuildingBlocker(index)) return false;
+  const anchor = b.anchor;
+  state.tiles.forEach((t, i) => {
+    if (t.building && t.building.anchor === anchor) {
+      t.building = null;
+      t.product = null;
+      t.produceAt = null;
+      renderTile(i);
+    }
+  });
+  if (b.type === 'warehouse') renderStorage();
+  showToast(`${CONFIG.buildings[b.type].icon} ${CONFIG.buildings[b.type].name} removed`);
   saveGame();
   return true;
 }
@@ -1346,6 +1507,8 @@ function tick() {
     state.tiles.forEach((t, i) => renderTile(i));
     saveGame();
   }
+
+  refreshTileMenu();
 }
 
 /* =========================================================
@@ -1668,6 +1831,181 @@ function onSlotPointerDown(grid, item, e, startDrag) {
 }
 
 /* =========================================================
+   TILE MENU — click a crop, animal or building:
+   Collect (to Storage) / Sell / Remove
+   ========================================================= */
+let menuTile = -1;     // tile the menu is open for, or -1
+let menuKind = '';     // what it was opened for: 'crop' | 'animal' | 'product' | 'building'
+
+// What the menu shows for a tile: { kind, icon, name, actions: [{ label, icon, why, run, remove }] }
+// `why` is '' when the action can be used, otherwise the reason it is disabled.
+function tileMenuSpec(i) {
+  const tile = state.tiles[i];
+  if (!tile || !tile.unlocked) return null;
+  const noWarehouse = storageCapacity() === 0
+    ? `Build a Warehouse first! ${CONFIG.buildings.warehouse.icon}` : '';
+
+  if (tile.animal) {
+    const a = CONFIG.animals[tile.animal.type];
+    const grown = isGrown(tile);
+    const notYet = grown ? '' : `Not grown up yet! ${a.icon}`;
+    return {
+      kind: 'animal', icon: grown ? a.grownIcon : a.icon,
+      name: grown ? goodsInfo(a.grownGoods).name : a.name,
+      actions: [
+        { icon: '📦', label: 'Collect', why: notYet || noWarehouse, run: () => storeAnimal(i) },
+        { icon: '🪙', label: 'Sell', why: notYet, run: () => sellAnimal(i) },
+        { icon: '🗑️', label: 'Remove', why: '', remove: true, run: () => removeAnimal(i) },
+      ],
+    };
+  }
+  if (tile.product) {
+    const p = itemInfo(tile.product);
+    return {
+      kind: 'product', icon: p.icon, name: p.name,
+      actions: [
+        { icon: '📦', label: 'Collect', why: noWarehouse, run: () => storeProduct(i) },
+        { icon: '🪙', label: 'Sell', why: `The Market doesn't buy ${p.name}`, run: () => false },
+        { icon: '🗑️', label: 'Remove', why: '', remove: true, run: () => { takeProduct(i); saveGame(); return true; } },
+      ],
+    };
+  }
+  if (tile.building) {
+    const b = CONFIG.buildings[tile.building.type];
+    return {
+      kind: 'building', icon: b.icon, name: b.name,
+      actions: [
+        { icon: '🗑️', label: 'Remove', why: removeBuildingBlocker(i), remove: true, run: () => removeBuilding(i) },
+      ],
+    };
+  }
+  if (tile.crop) {
+    const c = CONFIG.crops[tile.crop.type];
+    const ripe = isRipe(tile);
+    const notYet = ripe ? '' : `Not ripe yet! ${c.seedlingIcon}`;
+    return {
+      kind: 'crop', icon: ripe ? c.ripeIcon : c.seedlingIcon, name: c.name,
+      actions: [
+        { icon: '📦', label: 'Collect', why: notYet || noWarehouse, run: () => storeCrop(i) },
+        { icon: '🪙', label: 'Sell', why: notYet, run: () => sellCrop(i) },
+        { icon: '🗑️', label: 'Remove', why: '', remove: true, run: () => removeCrop(i) },
+      ],
+    };
+  }
+  return null;
+}
+
+function removeCrop(i) {
+  state.tiles[i].crop = null;
+  renderTile(i);
+  saveGame();
+  return true;
+}
+
+function removeAnimal(i) {
+  state.tiles[i].animal = null;   // the pen stops making things (updatePens)
+  renderTile(i);
+  saveGame();
+  return true;
+}
+
+function closeTileMenu() {
+  if (menuTile >= 0) $('field').children[menuTile].classList.remove('selected');
+  menuTile = -1;
+  menuKind = '';
+  $('tile-menu').classList.remove('open');
+}
+
+function openTileMenu(i) {
+  closeTileMenu();
+  const spec = tileMenuSpec(i);
+  if (!spec) return;
+  menuTile = i;
+  menuKind = spec.kind;
+  $('field').children[i].classList.add('selected');
+  drawTileMenu(spec);
+  const menu = $('tile-menu');
+  menu.classList.add('open');
+  // Next to the tile: on its right, or on its left if there is no room.
+  const r = $('field').children[i].getBoundingClientRect();
+  const w = menu.offsetWidth, h = menu.offsetHeight;
+  let x = r.right + 8;
+  if (x + w > window.innerWidth - 8) x = r.left - w - 8;
+  x = Math.max(8, Math.min(x, window.innerWidth - w - 8));
+  const y = Math.max(8, Math.min(r.top, window.innerHeight - h - 8));
+  menu.style.left = x + 'px';
+  menu.style.top = y + 'px';
+}
+
+const menuSig = spec => JSON.stringify([spec.icon, spec.name, spec.actions.map(a => a.why)]);
+
+function drawTileMenu(spec) {
+  const menu = $('tile-menu');
+  menu.dataset.sig = menuSig(spec);
+  menu.innerHTML = `<div class="menu-title"><span class="icon">${spec.icon}</span><span>${spec.name}</span></div>`;
+  spec.actions.forEach((act, n) => {
+    const btn = document.createElement('button');
+    btn.dataset.action = n;
+    btn.className = (act.remove ? 'remove' : '') + (act.why ? ' off' : '');
+    btn.setAttribute('aria-disabled', act.why ? 'true' : 'false');
+    if (act.why) btn.title = act.why;
+    btn.innerHTML = `<span>${act.icon}</span><span>${act.label}</span>`;
+    menu.appendChild(btn);
+  });
+}
+
+// Keep the menu up to date (a crop may ripen while it is open).
+function refreshTileMenu() {
+  if (menuTile < 0) return;
+  const spec = tileMenuSpec(menuTile);
+  if (!spec || spec.kind !== menuKind) { closeTileMenu(); return; }
+  if ($('tile-menu').dataset.sig !== menuSig(spec)) drawTileMenu(spec);
+}
+
+function onTileMenuClick(e) {
+  const btn = e.target.closest('button');
+  if (!btn || menuTile < 0) return;
+  const spec = tileMenuSpec(menuTile);
+  const act = spec && spec.actions[Number(btn.dataset.action)];
+  if (!act) return;
+  if (act.why) { showToast(act.why); return; }   // disabled: say why
+  if (act.run()) closeTileMenu();
+  else refreshTileMenu();
+}
+
+// Field press: a small move starts dragging (as before); a tap opens the menu.
+function onFieldPointerDown(e) {
+  const tileEl = e.target.closest('.tile');
+  if (!tileEl) return;
+  e.preventDefault();
+  const index = Number(tileEl.dataset.index);
+  const x0 = e.clientX, y0 = e.clientY;
+  tileEl.setPointerCapture(e.pointerId);
+  const cleanup = () => {
+    tileEl.removeEventListener('pointermove', onMove);
+    tileEl.removeEventListener('pointerup', onUp);
+    tileEl.removeEventListener('pointercancel', cleanup);
+  };
+  const onMove = ev => {
+    if (Math.hypot(ev.clientX - x0, ev.clientY - y0) < 6) return;
+    cleanup();
+    closeTileMenu();
+    const tile = state.tiles[index];
+    if (tile.animal) startAnimalDrag(tileEl, ev);
+    else if (tile.product) startProductDrag(tileEl, ev);
+    else startHarvestDrag(tileEl, ev);
+  };
+  const onUp = () => {
+    cleanup();
+    if (menuTile === index) closeTileMenu();
+    else openTileMenu(index);
+  };
+  tileEl.addEventListener('pointermove', onMove);
+  tileEl.addEventListener('pointerup', onUp);
+  tileEl.addEventListener('pointercancel', cleanup);
+}
+
+/* =========================================================
    INPUT
    ========================================================= */
 function onToolClick(toolId) {
@@ -1723,17 +2061,19 @@ function setupInput() {
     if (row) onSlotPointerDown($('storage-items'), row, e, startStorageDrag);
   });
 
-  // Field: drag ripe crops (to the Market or Storage) and big animals (to Storage).
-  $('field').addEventListener('pointerdown', e => {
-    const tileEl = e.target.closest('.tile');
-    if (!tileEl) return;
-    const tile = state.tiles[Number(tileEl.dataset.index)];
-    if (tile.animal) startAnimalDrag(tileEl, e);
-    else if (tile.product) startProductDrag(tileEl, e);
-    else startHarvestDrag(tileEl, e);
-  });
+  // Field: tap a tile for its menu; drag ripe crops (to the Market or Storage)
+  // and big animals / pen products (to Storage).
+  $('field').addEventListener('pointerdown', onFieldPointerDown);
+
+  // Tile menu: buttons; a press anywhere else closes it.
+  $('tile-menu').addEventListener('click', onTileMenuClick);
+  document.addEventListener('pointerdown', e => {
+    if (!e.target.closest('#tile-menu') && !e.target.closest('#field .tile')) closeTileMenu();
+  }, true);
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeTileMenu(); });
 
   window.addEventListener('resize', () => {
+    closeTileMenu();
     [shop, market, build, storage].forEach(win => {
       if (win.classList.contains('open')) placeWindow(win, win.offsetLeft, win.offsetTop);
     });
