@@ -48,6 +48,16 @@ function renderTile(i) {
     // Something the pigpen made, waiting to be collected.
     icon = itemInfo(tile.product).icon;
     baby = !!CONFIG.animals[tile.product];
+  } else if (tile.building && tile.building.type === 'butcher') {
+    if (tile.output) {
+      // Finished: the meat waits here, "×5" in the label.
+      icon = itemInfo(tile.output.id).icon;
+      timer = `×${tile.output.count}`;
+    } else {
+      icon = CONFIG.buildings.butcher.icon;
+      if (tile.job) timer = formatTime(tile.job.doneAt - gameNow());
+    }
+    el.classList.toggle('working', !!tile.job);
   } else if (tile.building) {
     if (tile.building.type === 'pigpen' && tile.building.anchor === i) {
       // Empty pig tile: a faded pig shows "a pig can go here".
@@ -68,6 +78,7 @@ function renderTile(i) {
       timer = formatTime(crop.growTimeMs - (now - tile.crop.plantedAt));
     }
   }
+  if (!tile.building || tile.building.type !== 'butcher') el.classList.remove('working');
   el.classList.toggle('baby', baby);
   el.classList.toggle('pen-empty', penEmpty);
   // Only touch the DOM when something changed.
@@ -139,11 +150,11 @@ function setMarketHover(goodsId, over) {
 
 // Brief "Sold!" message in the drop zone.
 let soldTimer = null;
-function flashMarketSale(goodsId, price) {
+function flashMarketSale(goodsId, price, count = 1) {
   const win = $('market-window');
   win.classList.add('sold');
   $('sell-zone-icon').textContent = '🪙';
-  $('sell-zone-main').textContent = `Sold ${goodsInfo(goodsId).name} for 🪙 ${price}!`;
+  $('sell-zone-main').textContent = `Sold ${count > 1 ? count + ' ' : ''}${goodsInfo(goodsId).name} for 🪙 ${price}!`;
   $('sell-zone-sub').textContent = 'Drag more goods here to sell';
   clearTimeout(soldTimer);
   soldTimer = setTimeout(() => { win.classList.remove('sold'); setMarketHover(null, false); }, 1200);

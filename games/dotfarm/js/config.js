@@ -68,6 +68,20 @@ const CONFIG = {
       icon: '🐖',
       basePrice: 50,         // average coins the Market pays for one
     },
+    meat: {
+      name: 'Meat',
+      icon: '🥩',
+      basePrice: 15,         // average coins the Market pays for one (a pig makes 5)
+    },
+  },
+
+  // --- Butcher: turns 1 Big Pig into Meat ---
+  // Drag a Big Pig (from a pen or from Storage) onto a Butcher.
+  butcher: {
+    input: 'bigPig',              // goods it takes
+    output: 'meat',               // goods it makes
+    outputCount: 5,               // how many it makes from one input
+    workTimeMs: 10 * 60 * 1000,   // how long it takes (10 minutes)
   },
 
   newLand: {
@@ -88,6 +102,12 @@ const CONFIG = {
       name: 'Warehouse',
       icon: '🏠',
       cost: 30,
+      size: 1,
+    },
+    butcher: {
+      name: 'Butcher',
+      icon: '🔪',
+      cost: 80,
       size: 1,
     },
   },

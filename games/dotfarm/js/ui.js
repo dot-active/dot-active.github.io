@@ -216,16 +216,19 @@ function startAnimalDrag(tileEl, e) {
     over(x, y) {
       setMarketHover(goodsId, isOverMarket(x, y));
       storage.classList.toggle('drop-target', isOverStorage(x, y));
+      highlightFeedTarget(goodsId, x, y);   // a Butcher lights up
     },
     end() {
       tileEl.style.opacity = '';
       setMarketHover(null, false);
       storage.classList.remove('drop-target');
+      clearDropHighlight();
     },
     drop(x, y) {
       if (isOverMarket(x, y)) return sellAnimal(index);
       if (isOverStorage(x, y)) return storeAnimal(index);
-      return false;
+      const i = tileIndexAt(x, y);
+      return i >= 0 && butcherFromField(index, i);
     },
   });
 }
@@ -261,6 +264,31 @@ function startProductDrag(tileEl, e) {
   });
 }
 
+/* ---------- Butcher output: → Market (sell all) or Storage (keep all) ---------- */
+function startOutputDrag(tileEl, e) {
+  const index = Number(tileEl.dataset.index);
+  const out = state.tiles[index].output;
+  if (!out) return;
+  const storage = $('storage-window');
+  tileEl.style.opacity = '0.35';
+  startIconDrag(e, tileEl, goodsInfo(out.id).icon, {
+    over(x, y) {
+      setMarketHover(out.id, isOverMarket(x, y));
+      storage.classList.toggle('drop-target', isOverStorage(x, y));
+    },
+    end() {
+      tileEl.style.opacity = '';
+      setMarketHover(null, false);
+      storage.classList.remove('drop-target');
+    },
+    drop(x, y) {
+      if (isOverMarket(x, y)) return sellOutput(index);
+      if (isOverStorage(x, y)) return storeOutput(index);
+      return false;
+    },
+  });
+}
+
 /* ---------- Stored things: Storage → Market (goods) or → a tile (Fertilizer, Baby Pig) ---------- */
 function startStorageDrag(row, e) {
   const id = row.dataset.goods;
@@ -277,7 +305,9 @@ function startStorageDrag(row, e) {
       drop(x, y) {
         if (isOverMarket(x, y)) return sellFromStorage(id);
         const i = tileIndexAt(x, y);
-        return i >= 0 && feedFromStorage(id, i);   // feed a growing animal
+        if (i < 0) return false;
+        if (id === CONFIG.butcher.input && canButcher(i)) return butcherFromStorage(i);
+        return feedFromStorage(id, i);   // feed a growing animal
       },
     });
   } else {
@@ -354,6 +384,42 @@ function tileMenuSpec(i) {
         { icon: '📦', label: 'Collect', why: noWarehouse, run: () => storeProduct(i) },
         { icon: '🪙', label: 'Sell', why: `The Market doesn't buy ${p.name}`, run: () => false },
         { icon: '🗑️', label: 'Remove', why: '', remove: true, run: () => { takeProduct(i); saveGame(); return true; } },
+      ],
+    };
+  }
+  if (tile.building && tile.building.type === 'butcher') {
+    const b = CONFIG.buildings.butcher, bc = CONFIG.butcher;
+    const input = goodsInfo(bc.input), out = goodsInfo(bc.output);
+    const remove = { icon: '🗑️', label: 'Remove', why: removeBuildingBlocker(i), remove: true, run: () => removeBuilding(i) };
+    if (tile.output) {
+      return {
+        kind: 'butcher-done', icon: out.icon, name: `${out.name} ×${tile.output.count}`,
+        actions: [
+          { icon: '📦', label: 'Collect', why: noWarehouse, run: () => storeOutput(i) },
+          { icon: '🪙', label: 'Sell all', why: '', run: () => sellOutput(i) },
+          remove,
+        ],
+      };
+    }
+    if (tile.job) {
+      const wait = `Ready in ${formatTime(tile.job.doneAt - gameNow())} ⏱️`;
+      return {
+        kind: 'butcher-busy', icon: b.icon, name: `${b.name} · working`,
+        actions: [
+          { icon: '📦', label: 'Collect', why: wait, run: () => false },
+          { icon: '🪙', label: 'Sell', why: wait, run: () => false },
+          remove,
+        ],
+      };
+    }
+    const have = state.storage[bc.input] || 0;
+    return {
+      kind: 'butcher', icon: b.icon, name: b.name,
+      actions: [
+        { icon: input.icon, label: `Use ${input.name} (${have})`,
+          why: have ? '' : `No ${input.name} in Storage — drag one here from a pen`,
+          run: () => butcherFromStorage(i) },
+        remove,
       ],
     };
   }
@@ -480,6 +546,7 @@ function onFieldPointerDown(e) {
     const tile = state.tiles[index];
     if (tile.animal) startAnimalDrag(tileEl, ev);
     else if (tile.product) startProductDrag(tileEl, ev);
+    else if (tile.output) startOutputDrag(tileEl, ev);
     else startHarvestDrag(tileEl, ev);
   };
   const onUp = () => {

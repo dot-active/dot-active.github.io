@@ -67,8 +67,10 @@ function newGameState() {
       // animal:   null, or { type: 'pig', bornAt: <game time ms> } (only on a pen's first tile)
       // product:  null, or 'fertilizer' / 'pig' waiting on a pen's second tile
       // produceAt: game time the pen's second tile will make its next thing, or null
+      // job:      null, or { doneAt: <game time ms> } while a Butcher is working
+      // output:   null, or { id: 'meat', count: 5 } waiting on a Butcher
       tiles.push({ col, row, unlocked: inStart, crop: null, building: null, animal: null,
-                   product: null, produceAt: null });
+                   product: null, produceAt: null, job: null, output: null });
     }
   }
   const tools = {};

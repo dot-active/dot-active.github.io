@@ -233,8 +233,13 @@ function feedFromStorage(foodId, animalIndex) {
 function highlightFeedTarget(foodId, x, y) {
   clearDropHighlight();
   const i = tileIndexAt(x, y);
-  if (i >= 0 && state.tiles[i].animal) {
+  if (i < 0) return;
+  const t = state.tiles[i];
+  if (t.animal) {
     $('field').children[i].classList.add(canFeed(foodId, i) ? 'drop-ok' : 'drop-bad');
+  } else if (t.building && t.building.type === 'butcher' && foodId === CONFIG.butcher.input) {
+    // A Big Pig over a Butcher: green if it is free.
+    $('field').children[i].classList.add(canButcher(i) ? 'drop-ok' : 'drop-bad');
   }
 }
 
@@ -275,12 +280,12 @@ function isRipe(tile, now = gameNow()) {
 }
 
 // Add coins for one item at the current Market price.
-function earnFromSale(cropId) {
-  const price = state.market.prices[cropId];
+function earnFromSale(cropId, count = 1) {
+  const price = state.market.prices[cropId] * count;
   state.coins += price;
   renderCoins();
   showToast(`Sold for 🪙 ${price}!`);
-  flashMarketSale(cropId, price);
+  flashMarketSale(cropId, price, count);
 }
 
 // Sell the ripe crop on a tile at the current Market price.
@@ -320,12 +325,12 @@ function storageStacks() {
   return stacks;
 }
 // Is there room for one more `id`? Shows a toast if not.
-function roomInStorage(id) {
+function roomInStorage(id, count = 1) {
   if (storageCapacity() === 0) {
     showToast(`Build a Warehouse first! ${CONFIG.buildings.warehouse.icon}`);
     return false;
   }
-  const after = { ...state.storage, [id]: (state.storage[id] || 0) + 1 };
+  const after = { ...state.storage, [id]: (state.storage[id] || 0) + count };
   if (storageSlotsUsed(after) > storageCapacity()) {
     showToast('Storage is full! 📦');
     return false;
@@ -437,6 +442,10 @@ function removeBuildingBlocker(index) {
       return 'Empty the Pigpen first! 🐷';
     }
   }
+  if (b.type === 'butcher') {
+    const t = state.tiles[b.anchor];
+    if (t.job || t.output) return `Empty the Butcher first! ${CONFIG.buildings.butcher.icon}`;
+  }
   if (b.type === 'warehouse') {
     const free = storageCapacity() - storageSlotsUsed();
     const need = CONFIG.storage.slotsPerWarehouse;
@@ -455,11 +464,91 @@ function removeBuilding(index) {
       t.building = null;
       t.product = null;
       t.produceAt = null;
+      t.job = null;
+      t.output = null;
       renderTile(i);
     }
   });
   if (b.type === 'warehouse') renderStorage();
   showToast(`${CONFIG.buildings[b.type].icon} ${CONFIG.buildings[b.type].name} removed`);
+  saveGame();
+  return true;
+}
+
+/* =========================================================
+   BUTCHER — 1 Big Pig → 5 Meat in 10 minutes
+   ========================================================= */
+// Is this tile an idle Butcher (not working, nothing waiting)?
+function canButcher(index) {
+  const t = state.tiles[index];
+  return !!t && !!t.building && t.building.type === 'butcher' && !t.job && !t.output;
+}
+
+function startButchering(index) {
+  state.tiles[index].job = { doneAt: gameNow() + CONFIG.butcher.workTimeMs };
+  renderTile(index);
+  showToast(`${CONFIG.buildings.butcher.icon} Making ${goodsInfo(CONFIG.butcher.output).name}…`);
+  saveGame();
+}
+
+// A big pig dragged from its pen onto a Butcher.
+function butcherFromField(animalIndex, butcherIndex) {
+  const tile = state.tiles[animalIndex];
+  if (!isGrown(tile) || !canButcher(butcherIndex)) return false;
+  if (CONFIG.animals[tile.animal.type].grownGoods !== CONFIG.butcher.input) return false;
+  tile.animal = null;
+  renderTile(animalIndex);
+  startButchering(butcherIndex);
+  return true;
+}
+
+// A Big Pig taken from Storage.
+function butcherFromStorage(butcherIndex) {
+  const id = CONFIG.butcher.input;
+  if (!(state.storage[id] > 0) || !canButcher(butcherIndex)) return false;
+  state.storage[id] -= 1;
+  if (state.storage[id] === 0) delete state.storage[id];
+  renderStorage();
+  startButchering(butcherIndex);
+  return true;
+}
+
+// Runs every tick: finished jobs turn into output. Returns true if something changed.
+function updateButchers(now) {
+  let changed = false;
+  state.tiles.forEach((t, i) => {
+    if (t.job && now >= t.job.doneAt) {
+      t.job = null;
+      t.output = { id: CONFIG.butcher.output, count: CONFIG.butcher.outputCount };
+      renderTile(i);
+      changed = true;
+    }
+  });
+  return changed;
+}
+
+// Move all the finished output into Storage (needs room for all of it).
+function storeOutput(index) {
+  const t = state.tiles[index];
+  if (!t.output) return false;
+  const { id, count } = t.output;
+  if (!roomInStorage(id, count)) return false;
+  state.storage[id] = (state.storage[id] || 0) + count;
+  t.output = null;
+  renderTile(index);
+  renderStorage();
+  showToast(`${goodsInfo(id).icon} ×${count} Stored!`);
+  saveGame();
+  return true;
+}
+
+// Sell all the finished output at the current Market price.
+function sellOutput(index) {
+  const t = state.tiles[index];
+  if (!t.output) return false;
+  earnFromSale(t.output.id, t.output.count);
+  t.output = null;
+  renderTile(index);
   saveGame();
   return true;
 }
@@ -514,6 +603,9 @@ function tick() {
     saveGame();
   }
   renderMarketTimer();
+
+  // Butchers: finished jobs become Meat.
+  if (updateButchers(now)) saveGame();
 
   // Pigpens: make Fertilizer / Baby Pigs, then redraw.
   if (updatePens(now)) {
