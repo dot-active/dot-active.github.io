@@ -78,9 +78,8 @@ function placeAnimal(type, index, free = false) {
   }
   if (!free) state.coins -= a.price;
   state.tiles[spot].animal = { type, bornAt: gameNow() };
-  // The pen's second tile starts making something (unless it is still holding one).
+  // The pen's second tile starts making something on the next tick (updatePens).
   const p = partnerIndex(spot);
-  if (p >= 0 && !state.tiles[p].product) state.tiles[p].produceAt = nextProduceTime(gameNow());
   renderCoins();
   renderTile(spot);
   if (p >= 0) renderTile(p);
@@ -100,27 +99,41 @@ function useItemOn(id, index) {
   return false;
 }
 
-/* ---------- Pigpen production ---------- */
-// A random moment between produceMinMs and produceMaxMs from now.
-function nextProduceTime(now) {
-  const { produceMinMs: min, produceMaxMs: max } = CONFIG.pigpen;
+/* ---------- Pen production (Pigpen, Sheep Pen, ...) ---------- */
+const isPen = type => !!(CONFIG.buildings[type] && CONFIG.buildings[type].pen);
+
+// A random moment between the animal's produce.minMs and maxMs from now.
+function nextProduceTime(now, animalType) {
+  const { minMs: min, maxMs: max } = CONFIG.animals[animalType].produce;
   return now + min + Math.random() * (max - min);
+}
+
+// Pick one thing by its chance, e.g. { sheep: 0.3, wool: 0.7 }.
+function pickByChance(chances) {
+  const entries = Object.entries(chances);
+  const total = entries.reduce((s, [, c]) => s + c, 0);
+  let r = Math.random() * total;
+  for (const [id, c] of entries) { if ((r -= c) < 0) return id; }
+  return entries[entries.length - 1][0];
 }
 
 // Runs every tick. Returns true if something changed (so we save).
 function updatePens(now) {
   let changed = false;
   state.tiles.forEach((tile, i) => {
-    if (!tile.building || tile.building.type !== 'pigpen' || tile.building.anchor === i) return;
-    const pig = state.tiles[tile.building.anchor].animal;
-    if (!pig || tile.product) {
-      // No pig, or the last thing was not collected yet: nothing is made.
+    if (!tile.building || !isPen(tile.building.type) || tile.building.anchor === i) return;
+    const home = state.tiles[tile.building.anchor];
+    const animal = home.animal;
+    const produce = animal && CONFIG.animals[animal.type].produce;
+    // Nothing is made with no animal, while the last thing waits to be collected,
+    // or while a baby is too young.
+    if (!produce || tile.product || (produce.onlyWhenGrown && !isGrown(home, now))) {
       if (tile.produceAt != null) { tile.produceAt = null; changed = true; }
       return;
     }
-    if (tile.produceAt == null) { tile.produceAt = nextProduceTime(now); changed = true; return; }
+    if (tile.produceAt == null) { tile.produceAt = nextProduceTime(now, animal.type); changed = true; return; }
     if (now >= tile.produceAt) {
-      tile.product = Math.random() < CONFIG.pigpen.babyPigChance ? 'pig' : 'fertilizer';
+      tile.product = pickByChance(produce.chances);
       tile.produceAt = null;
       changed = true;
     }
@@ -128,13 +141,23 @@ function updatePens(now) {
   return changed;
 }
 
-// Pick up what a pigpen made: it leaves the tile and production starts again.
+// Pick up what a pen made: it leaves the tile, and the next one is
+// scheduled on the next tick (updatePens).
 function takeProduct(index) {
   const tile = state.tiles[index];
   tile.product = null;
-  const pig = state.tiles[tile.building.anchor].animal;
-  tile.produceAt = pig ? nextProduceTime(gameNow()) : null;
+  tile.produceAt = null;
   renderTile(index);
+}
+
+// Sell what a pen made (if the Market buys it, e.g. Wool).
+function sellProduct(index) {
+  const id = state.tiles[index].product;
+  if (!id || !goodsInfo(id)) return false;
+  earnFromSale(id);
+  takeProduct(index);
+  saveGame();
+  return true;
 }
 
 // Put what a pigpen made into Storage.
@@ -436,10 +459,11 @@ function placeBuilding(type, index) {
 // Why a building can't be removed right now, or '' if it can.
 function removeBuildingBlocker(index) {
   const b = state.tiles[index].building;
-  if (b.type === 'pigpen') {
+  if (isPen(b.type)) {
     const p = partnerIndex(b.anchor);
     if (state.tiles[b.anchor].animal || (p >= 0 && state.tiles[p].product)) {
-      return 'Empty the Pigpen first! 🐷';
+      const pen = CONFIG.buildings[b.type];
+      return `Empty the ${pen.name} first! ${pen.icon}`;
     }
   }
   if (b.type === 'butcher') {

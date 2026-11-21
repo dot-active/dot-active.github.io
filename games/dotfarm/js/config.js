@@ -35,7 +35,9 @@ const CONFIG = {
     price: 10,             // coins per use
     timeSavedMs: 9 * 60 * 1000,  // makes a growing crop ripen this much earlier (9 minutes)
   },
-  // --- Animals (bought in the Shop, placed in a Pigpen — one per pen tile) ---
+  // --- Animals (bought in the Shop, placed in their pen — one animal per pen) ---
+  // While an animal lives in its pen, the pen's second tile makes things now and then
+  // (see "produce"). Nothing new is made until that thing is collected (dragged away).
   animals: {
     pig: {
       name: 'Baby Pig',      // name shown in the shop
@@ -47,18 +49,32 @@ const CONFIG = {
       grownGoods: 'bigPig',  // a big pig is sold / stored as these goods (see "products")
       food: 'corn',          // drag this onto a growing baby to feed it
       feedTimeSavedMs: 10 * 60 * 1000, // each feeding makes it grow up this much earlier (10 minutes)
+      produce: {
+        onlyWhenGrown: false,       // false = a baby pig already makes things too
+        // Each new thing appears after a random wait between these two times (no countdown is shown).
+        minMs: 2 * 60 * 1000,       // shortest wait (2 minutes)
+        maxMs: 8 * 60 * 1000,       // longest wait (8 minutes)
+        // What it makes, and how likely each is (the chances should add up to 1).
+        chances: { pig: 0.5, fertilizer: 0.5 },   // Baby Pig half the time, Fertilizer the other half
+      },
     },
-  },
-
-  // --- Pigpen production ---
-  // A pigpen holds 1 pig (on its first tile). While the pig is there, the
-  // second tile makes a Fertilizer or a Baby Pig. Nothing new is made until
-  // that one is collected (dragged away).
-  pigpen: {
-    // Each new thing appears after a random wait between these two times (no countdown is shown).
-    produceMinMs: 2 * 60 * 1000,  // shortest wait (2 minutes)
-    produceMaxMs: 8 * 60 * 1000,  // longest wait (8 minutes)
-    babyPigChance: 0.5,           // chance it is a Baby Pig (otherwise Fertilizer): 0.5 = half the time
+    sheep: {
+      name: 'Baby Sheep',
+      icon: '🐑',            // baby sheep (drawn smaller on the field)
+      price: 40,
+      growTimeMs: 10 * 60 * 1000, // time to grow up (10 minutes)
+      grownIcon: '🐏',       // grown sheep on the field
+      home: 'sheepPen',
+      grownGoods: 'bigSheep',
+      food: 'corn',
+      feedTimeSavedMs: 10 * 60 * 1000,
+      produce: {
+        onlyWhenGrown: true,        // only a grown sheep makes things
+        minMs: 2 * 60 * 1000,
+        maxMs: 8 * 60 * 1000,
+        chances: { sheep: 0.3, wool: 0.7 },   // Baby Sheep 30%, Wool 70%
+      },
+    },
   },
 
   // --- Products (goods that are not crops) ---
@@ -67,6 +83,16 @@ const CONFIG = {
       name: 'Big Pig',
       icon: '🐖',
       basePrice: 50,         // average coins the Market pays for one
+    },
+    bigSheep: {
+      name: 'Sheep',
+      icon: '🐏',
+      basePrice: 60,
+    },
+    wool: {
+      name: 'Wool',
+      icon: '🧶',
+      basePrice: 20,
     },
     meat: {
       name: 'Meat',
@@ -97,6 +123,14 @@ const CONFIG = {
       icon: '🐷',          // icon in the Build window, while dragging, and on the field
       cost: 50,            // coins to build one
       size: 2,             // tiles it takes (2 side-by-side or one above the other)
+      pen: true,           // animals live here (see "home" in animals)
+    },
+    sheepPen: {
+      name: 'Sheep Pen',
+      icon: '🐑',
+      cost: 60,
+      size: 2,
+      pen: true,
     },
     warehouse: {
       name: 'Warehouse',

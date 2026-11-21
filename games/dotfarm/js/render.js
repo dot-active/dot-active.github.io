@@ -59,11 +59,11 @@ function renderTile(i) {
     }
     el.classList.toggle('working', !!tile.job);
   } else if (tile.building) {
-    if (tile.building.type === 'pigpen' && tile.building.anchor === i) {
-      // Empty pig tile: a faded pig shows "a pig can go here".
-      icon = CONFIG.buildings.pigpen.icon;
+    if (isPen(tile.building.type) && tile.building.anchor === i) {
+      // Empty animal tile: a faded animal shows "one can go here".
+      icon = CONFIG.buildings[tile.building.type].icon;
       penEmpty = true;
-    } else if (tile.building.type === 'pigpen') {
+    } else if (isPen(tile.building.type)) {
       // Production tile: stays empty until something appears (at a random time).
     } else if (tile.building.anchor === i) {
       icon = CONFIG.buildings[tile.building.type].icon;

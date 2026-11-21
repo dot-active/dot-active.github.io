@@ -233,30 +233,34 @@ function startAnimalDrag(tileEl, e) {
   });
 }
 
-/* ---------- Pigpen product: pen → Storage, or straight onto a tile ---------- */
-// Fertilizer → a growing crop.  Baby Pig → an empty pigpen.
+/* ---------- Pen product: pen → Storage, Market (Wool), or straight onto a tile ---------- */
+// Fertilizer → a growing crop.  Baby Pig / Baby Sheep → an empty pen of its kind.
 function startProductDrag(tileEl, e) {
   const index = Number(tileEl.dataset.index);
   const id = state.tiles[index].product;
   if (!id) return;
   const storage = $('storage-window');
+  const sellable = !!goodsInfo(id);
   tileEl.style.opacity = '0.35';
   startIconDrag(e, tileEl, itemInfo(id).icon, {
     over(x, y) {
       clearDropHighlight();
+      if (sellable) setMarketHover(id, isOverMarket(x, y));
       const onStorage = isOverStorage(x, y);
       storage.classList.toggle('drop-target', onStorage);
       const i = tileIndexAt(x, y);
-      if (!onStorage && i >= 0 && i !== index) {
+      if (!sellable && !onStorage && i >= 0 && i !== index) {
         $('field').children[i].classList.add(canUseItemOn(id, i) ? 'drop-ok' : 'drop-bad');
       }
     },
     end() {
       tileEl.style.opacity = '';
       clearDropHighlight();
+      if (sellable) setMarketHover(null, false);
       storage.classList.remove('drop-target');
     },
     drop(x, y) {
+      if (sellable && isOverMarket(x, y)) return sellProduct(index);
       if (isOverStorage(x, y)) return storeProduct(index);
       const i = tileIndexAt(x, y);
       return i >= 0 && useProductOn(index, i);
@@ -382,7 +386,8 @@ function tileMenuSpec(i) {
       kind: 'product', icon: p.icon, name: p.name,
       actions: [
         { icon: '📦', label: 'Collect', why: noWarehouse, run: () => storeProduct(i) },
-        { icon: '🪙', label: 'Sell', why: `The Market doesn't buy ${p.name}`, run: () => false },
+        { icon: '🪙', label: 'Sell', why: goodsInfo(tile.product) ? '' : `The Market doesn't buy ${p.name}`,
+          run: () => sellProduct(i) },
         { icon: '🗑️', label: 'Remove', why: '', remove: true, run: () => { takeProduct(i); saveGame(); return true; } },
       ],
     };
