@@ -45,7 +45,7 @@ const CONFIG = {
       price: 30,             // coins to buy one
       growTimeMs: 10 * 60 * 1000, // time to grow into a big pig (10 minutes)
       grownIcon: '🐖',       // big pig on the field
-      home: 'pigpen',        // building it must be placed in
+      home: 'pigpen',        // building it must be placed in (the Animal Pen)
       grownGoods: 'bigPig',  // a big pig is sold / stored as these goods (see "products")
       food: 'corn',          // drag this onto a growing baby to feed it
       feedTimeSavedMs: 10 * 60 * 1000, // each feeding makes it grow up this much earlier (10 minutes)
@@ -64,7 +64,7 @@ const CONFIG = {
       price: 40,
       growTimeMs: 10 * 60 * 1000, // time to grow up (10 minutes)
       grownIcon: '🐏',       // grown sheep on the field
-      home: 'sheepPen',
+      home: 'pigpen',        // the same Animal Pen as pigs
       grownGoods: 'bigSheep',
       food: 'corn',
       feedTimeSavedMs: 10 * 60 * 1000,
@@ -118,19 +118,12 @@ const CONFIG = {
 
   // --- Buildings (Build window) ---
   buildings: {
-    pigpen: {
-      name: 'Pigpen',
-      icon: '🐷',          // icon in the Build window, while dragging, and on the field
+    pigpen: {              // (id kept as 'pigpen' so old saves still work)
+      name: 'Animal Pen',
+      icon: '🐾',          // icon in the Build window, while dragging, and (faded) on an empty pen
       cost: 50,            // coins to build one
       size: 2,             // tiles it takes (2 side-by-side or one above the other)
-      pen: true,           // animals live here (see "home" in animals)
-    },
-    sheepPen: {
-      name: 'Sheep Pen',
-      icon: '🐑',
-      cost: 60,
-      size: 2,
-      pen: true,
+      pen: true,           // animals live here (see "home" in animals): 1 pig OR 1 sheep per pen
     },
     warehouse: {
       name: 'Warehouse',

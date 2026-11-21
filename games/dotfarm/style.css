@@ -314,15 +314,11 @@ footer {
 }
 
 /* ---------- Buildings on the field ---------- */
-.tile.bld-pigpen {
-  background: #f6c1cc;
+.tile.bld-pigpen {                               /* Animal Pen */
+  background: #c5e1a5;                                            /* grass */
   box-shadow: inset 0 0 0 4px #a0522d, inset 0 -6px 0 #a0522d;   /* wooden fence */
 }
-.tile.bld-sheepPen {
-  background: #c5e1a5;                                            /* grass */
-  box-shadow: inset 0 0 0 4px #8d6e63, inset 0 -6px 0 #8d6e63;   /* wooden fence */
-}
-.tile.pen-empty .tile-icon { opacity: .3; }     /* "a pig can go here" */
+.tile.pen-empty .tile-icon { opacity: .3; }     /* "an animal can go here" */
 .tile.baby .tile-icon { font-size: 65%; }        /* baby animals are drawn smaller */
 .tile.bld-warehouse {
   background: #c49a6c;

@@ -30,7 +30,7 @@ function canFertilize(index) {
 }
 
 // Returns true if fertilizing worked (the fertilizer is used up).
-// free = true for fertilizer the player already owns (made by a pigpen).
+// free = true for fertilizer the player already owns (made by a pen).
 function useFertilizer(index, free = false) {
   const f = CONFIG.fertilizer;
   if (!canFertilize(index)) return false;
@@ -47,7 +47,7 @@ function useFertilizer(index, free = false) {
   return true;
 }
 
-// The other tile of a 2-tile building (a pigpen's production tile), or -1.
+// The other tile of a 2-tile building (a pen's production tile), or -1.
 function partnerIndex(index) {
   const b = state.tiles[index].building;
   if (!b) return -1;
@@ -67,7 +67,7 @@ function canPlaceAnimal(type, index) {
 }
 
 // Returns true if the animal was placed.
-// free = true for a baby the player already owns (made by a pigpen).
+// free = true for a baby the player already owns (made by a pen).
 function placeAnimal(type, index, free = false) {
   const a = CONFIG.animals[type];
   const spot = animalSpot(type, index);
@@ -87,7 +87,7 @@ function placeAnimal(type, index, free = false) {
   return true;
 }
 
-/* ---------- Items you own (from Storage or a pigpen), used on a tile ---------- */
+/* ---------- Items you own (from Storage or a pen), used on a tile ---------- */
 function canUseItemOn(id, index) {
   if (id === 'fertilizer') return canFertilize(index);
   if (CONFIG.animals[id]) return canPlaceAnimal(id, index);
@@ -99,7 +99,7 @@ function useItemOn(id, index) {
   return false;
 }
 
-/* ---------- Pen production (Pigpen, Sheep Pen, ...) ---------- */
+/* ---------- Pen production (Animal Pen: pigs, sheep, ...) ---------- */
 const isPen = type => !!(CONFIG.buildings[type] && CONFIG.buildings[type].pen);
 
 // A random moment between the animal's produce.minMs and maxMs from now.
@@ -160,7 +160,7 @@ function sellProduct(index) {
   return true;
 }
 
-// Put what a pigpen made into Storage.
+// Put what a pen made into Storage.
 function storeProduct(index) {
   const id = state.tiles[index].product;
   if (!id || !roomInStorage(id)) return false;
@@ -172,7 +172,7 @@ function storeProduct(index) {
   return true;
 }
 
-// Use what a pigpen made straight away on another tile.
+// Use what a pen made straight away on another tile.
 function useProductOn(fromIndex, toIndex) {
   const id = state.tiles[fromIndex].product;
   if (!id || fromIndex === toIndex || !canUseItemOn(id, toIndex)) return false;
@@ -202,6 +202,10 @@ function migratePens() {
   delete state.storage.pork;
   delete state.market.prices.pork;
   delete state.market.change.pork;
+  // Sheep Pens were merged into the Animal Pen.
+  state.tiles.forEach(tile => {
+    if (tile.building && tile.building.type === 'sheepPen') tile.building.type = 'pigpen';
+  });
   state.tiles.forEach((tile, i) => {
     if (!tile.animal || !tile.building || tile.building.anchor === i) return;
     const anchor = state.tiles[tile.building.anchor];
@@ -631,7 +635,7 @@ function tick() {
   // Butchers: finished jobs become Meat.
   if (updateButchers(now)) saveGame();
 
-  // Pigpens: make Fertilizer / Baby Pigs, then redraw.
+  // Animal Pens: make Fertilizer / Baby Pigs / Wool / Baby Sheep, then redraw.
   if (updatePens(now)) {
     state.tiles.forEach((t, i) => renderTile(i));
     saveGame();
