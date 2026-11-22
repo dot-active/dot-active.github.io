@@ -172,7 +172,7 @@ function renderShop() {
   });
 
   // Non-seed items: data-item is the CONFIG key.
-  ['fertilizer', 'newLand'].forEach(key => {
+  ['fertilizer', 'newLand', 'petEgg'].forEach(key => {
     const f = CONFIG[key];
     list.appendChild(makeSlot(f.icon, f.name, `🪙 ${f.price}`, { item: key }));
   });
@@ -272,6 +272,7 @@ function renderAll() {
   renderMarket();
   renderBuild();
   renderStorage();
+  renderPets();
 }
 
 /* ---------- Toast ---------- */

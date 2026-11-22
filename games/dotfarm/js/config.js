@@ -110,6 +110,34 @@ const CONFIG = {
     workTimeMs: 10 * 60 * 1000,   // how long it takes (10 minutes)
   },
 
+  // --- Pets ---
+  // Buy a Pet Egg in the Shop and drag it onto the field (or into the Pets window):
+  // it hatches into one of the species below, picked at random.
+  petEgg: {
+    name: 'Pet Egg',
+    icon: '🥚',
+    price: 100,
+  },
+  pets: {
+    // The five stats, in the order they are shown.
+    stats: [
+      { id: 'str', name: 'Strength',  icon: '💪' },   // 力量
+      { id: 'agi', name: 'Agility',   icon: '💨' },   // 敏捷
+      { id: 'vit', name: 'Vitality',  icon: '❤️' },   // 体力
+      { id: 'end', name: 'Endurance', icon: '🛡️' },   // 耐力
+      { id: 'luk', name: 'Luck',      icon: '🍀' },   // 幸运
+    ],
+    baseEach: 10,       // every stat starts at this (5 x 10 = 50 fixed points)
+    randomPoints: 50,   // then this many points go, one by one, to random stats (total 100)
+    // The species an egg can hatch into (equal chance each).
+    // icon + accessory are drawn on top of each other.
+    species: {
+      lobster: { name: 'Clanker', kind: 'Armored Lobster',   icon: '🦞', accessory: '🛡️', accessorySpot: 'armor' },
+      weasel:  { name: 'Monty',   kind: 'Top-Hat Weasel',    icon: '🦦', accessory: '🎩', accessorySpot: 'hat' },
+      lizard:  { name: 'Snoots',  kind: 'Long-Snout Lizard', icon: '🐊', accessory: '',   accessorySpot: '' },
+    },
+  },
+
   newLand: {
     name: 'New Land',      // name shown in the shop
     icon: '🚜',            // icon in the shop and while dragging
@@ -162,6 +190,7 @@ const CONFIG = {
     { id: 'build',   icon: '🔨', label: 'Build',   unlocked: true  },
     { id: 'market',  icon: '💰', label: 'Market',  unlocked: false }, // unlocks when the first crop ripens
     { id: 'storage', icon: '📦', label: 'Storage', unlocked: true  },
+    { id: 'pets',    icon: '🐣', label: 'Pets',    unlocked: true  },
   ],
 
   // --- Debug ---

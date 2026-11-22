@@ -7,6 +7,7 @@ function onToolClick(toolId) {
   if (toolId === 'market') openWindow($('market-window'), 'left');
   if (toolId === 'build') openWindow($('build-window'), 'right', 330);
   if (toolId === 'storage') openWindow($('storage-window'), 'left', 280);
+  if (toolId === 'pets') openWindow($('pets-window'), 'right', 120);
 }
 
 function setupInput() {
@@ -29,6 +30,8 @@ function setupInput() {
       startTileItemDrag(item, e, CONFIG.fertilizer.icon, canFertilize, useFertilizer);
     else if (item.dataset.item === 'newLand')
       startTileItemDrag(item, e, CONFIG.newLand.icon, canUnlockLand, unlockLand);
+    else if (item.dataset.item === 'petEgg')
+      startEggDrag(item, e);
   }
 
   // Market window: drag by title, close button.
@@ -65,9 +68,19 @@ function setupInput() {
   }, true);
   document.addEventListener('keydown', e => { if (e.key === 'Escape') closeTileMenu(); });
 
+  // Pets window: drag by title, close button, rename a pet; hatch card button.
+  const pets = $('pets-window');
+  makeWindowDraggable(pets);
+  $('pets-close').addEventListener('click', () => closeWindow(pets));
+  $('pets-list').addEventListener('click', e => {
+    const btn = e.target.closest('.pet-rename');
+    if (btn) renamePet(btn.dataset.pet);
+  });
+  $('hatch-ok').addEventListener('click', closeHatchCard);
+
   window.addEventListener('resize', () => {
     closeTileMenu();
-    [shop, market, build, storage].forEach(win => {
+    [shop, market, build, storage, pets].forEach(win => {
       if (win.classList.contains('open')) placeWindow(win, win.offsetLeft, win.offsetTop);
     });
   });

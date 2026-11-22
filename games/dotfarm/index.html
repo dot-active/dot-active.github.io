@@ -78,6 +78,27 @@
   </div>
 </div>
 
+<!-- Pets window -->
+<div class="window pets-window" id="pets-window">
+  <div class="window-title">
+    <span>🐣 Pets</span>
+    <button class="window-close" id="pets-close" aria-label="Close">✖</button>
+  </div>
+  <div class="window-body">
+    <div class="pets-list" id="pets-list"></div>
+    <div class="shop-hint" id="pets-hint"></div>
+  </div>
+</div>
+
+<!-- "It hatched!" card -->
+<div class="hatch-overlay" id="hatch-overlay">
+  <div class="hatch-card">
+    <div class="hatch-title">🎉 It hatched!</div>
+    <div id="hatch-pet"></div>
+    <button class="hatch-ok" id="hatch-ok">Yay!</button>
+  </div>
+</div>
+
 <div class="tile-menu" id="tile-menu"></div>
 
 <div class="toast" id="toast"></div>
@@ -86,6 +107,7 @@
 <script src="js/state.js"></script>
 <script src="js/render.js"></script>
 <script src="js/farming.js"></script>
+<script src="js/pets.js"></script>
 <script src="js/ui.js"></script>
 <script src="js/main.js"></script>
 </body>

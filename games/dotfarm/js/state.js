@@ -87,6 +87,7 @@ function newGameState() {
     tiles,
     tools,           // which footer tools are unlocked
     storage: {},     // goods kept for later: { corn: 3, ... }
+    pets: [],        // hatched pets: { id, species, name, stats: { str, agi, vit, end, luk }, hatchedAt }
     market: {
       prices,        // current price per crop
       change,        // +1 went up, -1 went down, 0 no change (for the arrows)
@@ -126,6 +127,7 @@ function loadGame() {
       ...data,
       tools,
       storage: { ...(data.storage || {}) },
+      pets: Array.isArray(data.pets) ? data.pets : [],
       market: {
         ...fresh.market,
         ...m,
