@@ -111,8 +111,8 @@ const CONFIG = {
   },
 
   // --- Pets ---
-  // Buy a Pet Egg in the Shop and drag it onto the field (or into the Pets window):
-  // it hatches into one of the species below, picked at random.
+  // Buy a Pet Egg in the Shop and drag it into a Pet House (Build window).
+  // Then add Wool to keep it warm: it hatches into one of the species below, picked at random.
   petEgg: {
     name: 'Pet Egg',
     icon: '🥚',
@@ -165,6 +165,19 @@ const CONFIG = {
       cost: 80,
       size: 1,
     },
+    petHouse: {
+      name: 'Pet House',
+      icon: '🛖',
+      cost: 100,
+      size: 1,
+    },
+  },
+
+  // --- Pet House: keeps one Pet Egg warm until it hatches ---
+  petHouse: {
+    fuel: 'wool',                   // goods that keep the egg warm (one at a time)
+    incubateMs: 10 * 60 * 1000,     // each Wool keeps it warm this long (10 minutes)
+    hatchChance: 0.6,               // then it hatches with this chance (60%); otherwise the Wool is used up
   },
 
   // --- Storage (needs Warehouses) ---

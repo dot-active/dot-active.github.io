@@ -76,7 +76,7 @@ function setupInput() {
     const btn = e.target.closest('.pet-rename');
     if (btn) renamePet(btn.dataset.pet);
   });
-  $('hatch-ok').addEventListener('click', closeHatchCard);
+  $('hatch-ok').addEventListener('click', closeHatchCard);   // shows the next one, if several hatched
 
   window.addEventListener('resize', () => {
     closeTileMenu();

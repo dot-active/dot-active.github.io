@@ -330,6 +330,16 @@ footer {
 }
 .tile.bld-butcher.working .tile-icon { display: inline-block; animation: chop .6s ease-in-out infinite; }
 @keyframes chop { 50% { transform: rotate(-25deg) translateY(-6%); } }
+.tile.bld-petHouse {
+  background: #ffe0b2;
+  box-shadow: inset 0 0 0 4px #ef6c00, inset 0 -6px 0 #ef6c00;
+}
+/* Wool is keeping the egg warm: a cosy glow and a little wobble */
+.tile.bld-petHouse.incubating {
+  background: radial-gradient(circle, #fff3c4 30%, #ffcc80 100%);
+}
+.tile.bld-petHouse.incubating .tile-icon { display: inline-block; animation: egg-wobble 1.6s ease-in-out infinite; }
+@keyframes egg-wobble { 0%, 60%, 100% { transform: rotate(0); } 70% { transform: rotate(-12deg); } 85% { transform: rotate(12deg); } }
 
 /* ---------- Market ---------- */
 .window.drop-target { outline: 5px solid #43a047; }

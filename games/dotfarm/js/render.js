@@ -48,6 +48,10 @@ function renderTile(i) {
     // Something the pigpen made, waiting to be collected.
     icon = itemInfo(tile.product).icon;
     baby = !!CONFIG.animals[tile.product];
+  } else if (tile.building && tile.building.type === 'petHouse') {
+    // Empty: the house. With an egg: the egg, and a countdown while Wool keeps it warm.
+    icon = tile.egg ? CONFIG.petEgg.icon : CONFIG.buildings.petHouse.icon;
+    if (tile.incubate) timer = formatTime(tile.incubate.doneAt - gameNow());
   } else if (tile.building && tile.building.type === 'butcher') {
     if (tile.output) {
       // Finished: the meat waits here, "×5" in the label.
@@ -79,6 +83,7 @@ function renderTile(i) {
     }
   }
   if (!tile.building || tile.building.type !== 'butcher') el.classList.remove('working');
+  el.classList.toggle('incubating', !!tile.incubate);
   el.classList.toggle('baby', baby);
   el.classList.toggle('pen-empty', penEmpty);
   // Only touch the DOM when something changed.

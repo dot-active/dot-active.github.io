@@ -267,6 +267,9 @@ function highlightFeedTarget(foodId, x, y) {
   } else if (t.building && t.building.type === 'butcher' && foodId === CONFIG.butcher.input) {
     // A Big Pig over a Butcher: green if it is free.
     $('field').children[i].classList.add(canButcher(i) ? 'drop-ok' : 'drop-bad');
+  } else if (t.building && t.building.type === 'petHouse' && foodId === CONFIG.petHouse.fuel) {
+    // Wool over a Pet House: green if it holds an egg that is not already warm.
+    $('field').children[i].classList.add(canAddWool(i) ? 'drop-ok' : 'drop-bad');
   }
 }
 
@@ -470,6 +473,11 @@ function removeBuildingBlocker(index) {
       return `Empty the ${pen.name} first! ${pen.icon}`;
     }
   }
+  if (b.type === 'petHouse') {
+    const t = state.tiles[b.anchor];
+    if (t.incubate) return 'Wait until the egg is done! 🥚';
+    if (t.egg) return 'Take the egg out first! 🥚';
+  }
   if (b.type === 'butcher') {
     const t = state.tiles[b.anchor];
     if (t.job || t.output) return `Empty the Butcher first! ${CONFIG.buildings.butcher.icon}`;
@@ -494,6 +502,8 @@ function removeBuilding(index) {
       t.produceAt = null;
       t.job = null;
       t.output = null;
+      t.egg = false;
+      t.incubate = null;
       renderTile(i);
     }
   });
@@ -634,6 +644,9 @@ function tick() {
 
   // Butchers: finished jobs become Meat.
   if (updateButchers(now)) saveGame();
+
+  // Pet Houses: warm eggs may hatch.
+  if (updatePetHouses(now)) saveGame();
 
   // Animal Pens: make Fertilizer / Baby Pigs / Wool / Baby Sheep, then redraw.
   if (updatePens(now)) {

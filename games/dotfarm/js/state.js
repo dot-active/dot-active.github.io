@@ -69,8 +69,11 @@ function newGameState() {
       // produceAt: game time the pen's second tile will make its next thing, or null
       // job:      null, or { doneAt: <game time ms> } while a Butcher is working
       // output:   null, or { id: 'meat', count: 5 } waiting on a Butcher
+      // egg:      true when a Pet House holds a Pet Egg
+      // incubate: null, or { doneAt: <game time ms> } while Wool keeps the egg warm
       tiles.push({ col, row, unlocked: inStart, crop: null, building: null, animal: null,
-                   product: null, produceAt: null, job: null, output: null });
+                   product: null, produceAt: null, job: null, output: null,
+                   egg: false, incubate: null });
     }
   }
   const tools = {};

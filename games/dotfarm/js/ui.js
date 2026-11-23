@@ -249,7 +249,8 @@ function startProductDrag(tileEl, e) {
       const onStorage = isOverStorage(x, y);
       storage.classList.toggle('drop-target', onStorage);
       const i = tileIndexAt(x, y);
-      if (!sellable && !onStorage && i >= 0 && i !== index) {
+      if (sellable) highlightFeedTarget(id, x, y);   // Wool → a Pet House
+      else if (!onStorage && i >= 0 && i !== index) {
         $('field').children[i].classList.add(canUseItemOn(id, i) ? 'drop-ok' : 'drop-bad');
       }
     },
@@ -263,6 +264,7 @@ function startProductDrag(tileEl, e) {
       if (sellable && isOverMarket(x, y)) return sellProduct(index);
       if (isOverStorage(x, y)) return storeProduct(index);
       const i = tileIndexAt(x, y);
+      if (i >= 0 && id === CONFIG.petHouse.fuel && canAddWool(i)) return addWoolFromPen(index, i);
       return i >= 0 && useProductOn(index, i);
     },
   });
@@ -311,6 +313,7 @@ function startStorageDrag(row, e) {
         const i = tileIndexAt(x, y);
         if (i < 0) return false;
         if (id === CONFIG.butcher.input && canButcher(i)) return butcherFromStorage(i);
+        if (id === CONFIG.petHouse.fuel && canAddWool(i)) return addWoolFromStorage(i);
         return feedFromStorage(id, i);   // feed a growing animal
       },
     });
@@ -392,6 +395,7 @@ function tileMenuSpec(i) {
       ],
     };
   }
+  if (tile.building && tile.building.type === 'petHouse') return petHouseMenuSpec(i);
   if (tile.building && tile.building.type === 'butcher') {
     const b = CONFIG.buildings.butcher, bc = CONFIG.butcher;
     const input = goodsInfo(bc.input), out = goodsInfo(bc.output);
