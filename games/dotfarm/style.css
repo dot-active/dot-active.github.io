@@ -339,6 +339,44 @@ footer {
   background: radial-gradient(circle, #fff3c4 30%, #ffcc80 100%);
 }
 .tile.bld-petHouse.incubating .tile-icon { display: inline-block; animation: egg-wobble 1.6s ease-in-out infinite; }
+/* "I need food" speech bubble over a hungry pet */
+.tile.hungry::after {
+  content: 'I need food';
+  position: absolute;
+  left: 50%;
+  bottom: 82%;
+  transform: translateX(-50%);
+  padding: 2px 7px;
+  border: 2px solid #c62828;
+  border-radius: 10px;
+  background: #fff;
+  color: #c62828;
+  font-size: clamp(10px, calc(13cqw / var(--cols)), 14px);
+  font-weight: 800;
+  white-space: nowrap;
+  z-index: 5;
+  pointer-events: none;
+  box-shadow: 0 2px 0 rgba(0,0,0,.2);
+  animation: bubble-bob 1.2s ease-in-out infinite;
+}
+.tile.hungry::before {                 /* the bubble's little tail */
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: 74%;
+  width: 8px;
+  height: 8px;
+  background: #fff;
+  border-right: 2px solid #c62828;
+  border-bottom: 2px solid #c62828;
+  transform: translateX(-50%) rotate(45deg);
+  z-index: 6;
+  pointer-events: none;
+  animation: bubble-bob 1.2s ease-in-out infinite;
+}
+@keyframes bubble-bob { 50% { margin-bottom: 3px; } }
+.pet-status { margin-top: 6px; font-size: 12px; font-weight: 700; color: #7a5230; }
+.pet-status.hungry { color: #c62828; }
 @keyframes egg-wobble { 0%, 60%, 100% { transform: rotate(0); } 70% { transform: rotate(-12deg); } 85% { transform: rotate(12deg); } }
 
 /* ---------- Market ---------- */

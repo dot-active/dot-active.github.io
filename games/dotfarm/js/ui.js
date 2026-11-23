@@ -199,6 +199,7 @@ function startHarvestDrag(tileEl, e) {
       if (isOverMarket(x, y)) return sellCrop(index);
       if (isOverStorage(x, y)) return storeCrop(index);
       const i = tileIndexAt(x, y);
+      if (i >= 0 && canAddFood(i, cropId)) return addFoodFromField(index, i);   // feed a pet
       return i >= 0 && feedFromField(index, i);   // feed a growing animal
     },
   });
@@ -314,6 +315,7 @@ function startStorageDrag(row, e) {
         if (i < 0) return false;
         if (id === CONFIG.butcher.input && canButcher(i)) return butcherFromStorage(i);
         if (id === CONFIG.petHouse.fuel && canAddWool(i)) return addWoolFromStorage(i);
+        if (canAddFood(i, id)) return addFoodFromStorage(i, id);
         return feedFromStorage(id, i);   // feed a growing animal
       },
     });
@@ -531,7 +533,8 @@ function onTileMenuClick(e) {
   const act = spec && spec.actions[Number(btn.dataset.action)];
   if (!act) return;
   if (act.why) { showToast(act.why); return; }   // disabled: say why
-  if (act.run()) closeTileMenu();
+  // keepOpen: buttons you may tap several times in a row (e.g. Add Corn).
+  if (act.run() && !act.keepOpen) closeTileMenu();
   else refreshTileMenu();
 }
 

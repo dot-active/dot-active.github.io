@@ -49,9 +49,16 @@ function renderTile(i) {
     icon = itemInfo(tile.product).icon;
     baby = !!CONFIG.animals[tile.product];
   } else if (tile.building && tile.building.type === 'petHouse') {
-    // Empty: the house. With an egg: the egg, and a countdown while Wool keeps it warm.
-    icon = tile.egg ? CONFIG.petEgg.icon : CONFIG.buildings.petHouse.icon;
-    if (tile.incubate) timer = formatTime(tile.incubate.doneAt - gameNow());
+    const pet = tile.pet && petById(tile.pet);
+    if (pet) {
+      // The pet lives here: show it, and how much food is left.
+      icon = CONFIG.pets.species[pet.species].icon;
+      if (tile.food) timer = `${goodsInfo(tile.food.id).icon}${tile.food.count}`;
+    } else {
+      // Empty: the house. With an egg: the egg, and a countdown while Wool keeps it warm.
+      icon = tile.egg ? CONFIG.petEgg.icon : CONFIG.buildings.petHouse.icon;
+      if (tile.incubate) timer = formatTime(tile.incubate.doneAt - gameNow());
+    }
   } else if (tile.building && tile.building.type === 'butcher') {
     if (tile.output) {
       // Finished: the meat waits here, "×5" in the label.
@@ -84,6 +91,7 @@ function renderTile(i) {
   }
   if (!tile.building || tile.building.type !== 'butcher') el.classList.remove('working');
   el.classList.toggle('incubating', !!tile.incubate);
+  el.classList.toggle('hungry', !!tile.pet && !!tile.hungry);   // "I need food" bubble
   el.classList.toggle('baby', baby);
   el.classList.toggle('pen-empty', penEmpty);
   // Only touch the DOM when something changed.

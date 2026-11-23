@@ -178,6 +178,12 @@ const CONFIG = {
     fuel: 'wool',                   // goods that keep the egg warm (one at a time)
     incubateMs: 10 * 60 * 1000,     // each Wool keeps it warm this long (10 minutes)
     hatchChance: 0.6,               // then it hatches with this chance (60%); otherwise the Wool is used up
+    // After hatching, the pet lives in its Pet House and needs food.
+    foods: ['corn', 'meat'],        // what it eats (only one kind in the house at a time)
+    maxFood: 10,                    // the most food the house holds
+    mealEveryMs: 5 * 60 * 60 * 1000, // it eats every 5 hours...
+    eatMin: 1,                      // ...between eatMin
+    eatMax: 3,                      // ...and eatMax pieces of food
   },
 
   // --- Storage (needs Warehouses) ---
