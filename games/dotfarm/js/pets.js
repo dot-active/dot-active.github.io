@@ -154,7 +154,7 @@ function addFood(i, foodId) {
   t.food.count += 1;
   if (t.hungry) {
     eatMeal(t);
-    t.hungry = false;
+    stopHunger(t);
     t.nextMealAt = gameNow() + CONFIG.petHouse.mealEveryMs;
     showToast(`${CONFIG.pets.species[petById(t.pet).species].icon} Yum!`);
   }
@@ -191,24 +191,70 @@ function eatMeal(t) {
   if (t.food.count <= 0) t.food = null;   // empty: any kind of food can go in again
 }
 
+function stopHunger(t) {
+  t.hungry = false;
+  t.hungrySince = null;
+  t.runCheckAt = null;
+}
+
+// Hungry for runAwayWarnMs (10 hours) or more: it says it will run away.
+function isRunningAway(t, now = gameNow()) {
+  return !!t.hungry && t.hungrySince != null && now - t.hungrySince >= CONFIG.petHouse.runAwayWarnMs;
+}
+
+// The pet leaves its house and your pets for good.
+function petRunsAway(i) {
+  const t = state.tiles[i];
+  const pet = petById(t.pet);
+  state.pets = state.pets.filter(p => p.id !== t.pet);
+  t.pet = null;
+  t.food = null;
+  t.nextMealAt = null;
+  stopHunger(t);
+  renderTile(i);
+  if (pet) showToast(`${CONFIG.pets.species[pet.species].icon} ${pet.name} ran away… 😢`);
+}
+
 // Runs every tick. Catches up on meals missed while the page was closed;
 // with no food at meal time, the pet is hungry until food is added.
+// Hungry for 10 hours: it threatens to run away, then every 5 hours it
+// leaves with a 20% chance.
 function updatePetMeals(now) {
+  const ph = CONFIG.petHouse;
   let changed = false;
   state.tiles.forEach((t, i) => {
     if (!t.pet || t.nextMealAt == null) return;
-    let ate = false;
+    let redraw = false;
     while (now >= t.nextMealAt) {
       if (!t.food) {
-        if (!t.hungry) { t.hungry = true; changed = true; }
+        if (!t.hungry) {
+          t.hungry = true;
+          t.hungrySince = t.nextMealAt;   // when it really got hungry (even if the page was closed)
+          redraw = true;
+        }
         break;
       }
       eatMeal(t);
-      t.nextMealAt += CONFIG.petHouse.mealEveryMs;
-      t.hungry = false;
-      ate = changed = true;
+      t.nextMealAt += ph.mealEveryMs;
+      stopHunger(t);
+      redraw = true;
     }
-    if (ate || changed) renderTile(i);
+    if (t.hungry) {
+      if (t.hungrySince == null) { t.hungrySince = now; redraw = true; }   // older saves
+      // Run-away rolls at 10 + 5 h, 10 + 10 h, ... after getting hungry.
+      if (t.runCheckAt == null) { t.runCheckAt = t.hungrySince + ph.runAwayWarnMs + ph.runAwayCheckMs; redraw = true; }
+      while (t.pet && now >= t.runCheckAt) {
+        if (Math.random() < ph.runAwayChance) petRunsAway(i);
+        else t.runCheckAt += ph.runAwayCheckMs;
+        redraw = true;
+      }
+    }
+    // The bubble text changes at the 10-hour mark.
+    const el = $('field').children[i];
+    if (redraw || el.classList.contains('runaway') !== (!!t.pet && isRunningAway(t, now))) {
+      renderTile(i);
+      changed = true;
+    }
   });
   if (changed) renderPets();
   return changed;
@@ -223,12 +269,15 @@ function petHouseMenuSpec(i) {
   if (pet) {
     const ph = CONFIG.petHouse;
     const count = t.food ? t.food.count : 0;
-    const status = t.hungry ? 'Hungry! Add food 🍽️'
+    const status = isRunningAway(t) ? 'Feed me now or I will run away! 🎒'
+      : t.hungry ? 'Hungry! Add food 🍽️'
       : `${count}/${ph.maxFood} food · next meal in ${formatTime(t.nextMealAt - gameNow())}`;
     return {
       kind: 'petHouse-pet', icon: CONFIG.pets.species[pet.species].icon, name: pet.name,
       actions: [
-        { icon: t.hungry ? '😢' : '🍽️', label: t.hungry ? 'I need food!' : `${count}/${ph.maxFood} food`, why: status, run: () => false },
+        { icon: isRunningAway(t) ? '🎒' : t.hungry ? '😢' : '🍽️',
+          label: isRunningAway(t) ? "I'm running away!" : t.hungry ? 'I need food!' : `${count}/${ph.maxFood} food`,
+          why: status, run: () => false },
         ...ph.foods.map(foodId => {
           const g = goodsInfo(foodId), have = state.storage[foodId] || 0;
           const why = addFoodBlocker(i, foodId) || (have ? '' : `No ${g.name} in Storage`);
@@ -297,6 +346,7 @@ function petStatusHtml(pet) {
   return `<div class="pet-status${t.hungry ? ' hungry' : ''}" data-pet="${pet.id}">${petStatusText(t)}</div>`;
 }
 function petStatusText(t) {
+  if (isRunningAway(t)) return "🎒 Wants to run away! Feed it now";
   if (t.hungry) return '😢 Hungry! Add food to its Pet House';
   const food = t.food ? `${goodsInfo(t.food.id).icon} ${t.food.count}/${CONFIG.petHouse.maxFood}` : 'no food';
   return `${CONFIG.buildings.petHouse.icon} Home · ${food} · next meal ${formatTime(t.nextMealAt - gameNow())}`;

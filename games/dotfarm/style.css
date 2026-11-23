@@ -353,7 +353,10 @@ footer {
   color: #c62828;
   font-size: clamp(10px, calc(13cqw / var(--cols)), 14px);
   font-weight: 800;
-  white-space: nowrap;
+  width: max-content;
+  max-width: 190%;          /* wraps onto 2 lines on small (phone) tiles */
+  text-align: center;
+  line-height: 1.15;
   z-index: 5;
   pointer-events: none;
   box-shadow: 0 2px 0 rgba(0,0,0,.2);
@@ -375,6 +378,18 @@ footer {
   animation: bubble-bob 1.2s ease-in-out infinite;
 }
 @keyframes bubble-bob { 50% { margin-bottom: 3px; } }
+/* Hungry 10+ hours: it threatens to leave */
+.tile.hungry.runaway::after {
+  content: "I'm running away!";
+  background: #c62828;
+  color: #fff;
+  animation: bubble-shake .5s ease-in-out infinite;
+}
+.tile.hungry.runaway::before {
+  background: #c62828;
+  animation: none;
+}
+@keyframes bubble-shake { 25% { margin-left: -2px; } 75% { margin-left: 2px; } }
 .pet-status { margin-top: 6px; font-size: 12px; font-weight: 700; color: #7a5230; }
 .pet-status.hungry { color: #c62828; }
 @keyframes egg-wobble { 0%, 60%, 100% { transform: rotate(0); } 70% { transform: rotate(-12deg); } 85% { transform: rotate(12deg); } }

@@ -92,6 +92,7 @@ function renderTile(i) {
   if (!tile.building || tile.building.type !== 'butcher') el.classList.remove('working');
   el.classList.toggle('incubating', !!tile.incubate);
   el.classList.toggle('hungry', !!tile.pet && !!tile.hungry);   // "I need food" bubble
+  el.classList.toggle('runaway', !!tile.pet && isRunningAway(tile));   // "I'm running away!" bubble
   el.classList.toggle('baby', baby);
   el.classList.toggle('pen-empty', penEmpty);
   // Only touch the DOM when something changed.

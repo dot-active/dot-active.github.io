@@ -184,6 +184,10 @@ const CONFIG = {
     mealEveryMs: 5 * 60 * 60 * 1000, // it eats every 5 hours...
     eatMin: 1,                      // ...between eatMin
     eatMax: 3,                      // ...and eatMax pieces of food
+    // A pet left hungry too long wants to run away:
+    runAwayWarnMs: 10 * 60 * 60 * 1000,  // after 10 hours hungry its bubble says it will run away...
+    runAwayCheckMs: 5 * 60 * 60 * 1000,  // ...then every 5 hours...
+    runAwayChance: 0.2,                  // ...it leaves for good with this chance (20%)
   },
 
   // --- Storage (needs Warehouses) ---

@@ -74,6 +74,7 @@ function newGameState() {
       // pet:      null, or the id of the pet living in a Pet House
       // food:     null, or { id: 'corn', count: 7 } in a Pet House
       // nextMealAt: game time of the pet's next meal;  hungry: true if it found no food
+      // hungrySince: game time it became hungry;  runCheckAt: next "does it run away?" roll
       tiles.push({ col, row, unlocked: inStart, crop: null, building: null, animal: null,
                    product: null, produceAt: null, job: null, output: null,
                    egg: false, incubate: null, pet: null, food: null, nextMealAt: null, hungry: false });
