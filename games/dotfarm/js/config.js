@@ -119,14 +119,29 @@ const CONFIG = {
     price: 100,
   },
   pets: {
-    // The five stats, in the order they are shown.
+    // The five stats, in the order they are shown, and what each one does in battle.
+    // (ids stay the same so old saves keep their points)
     stats: [
-      { id: 'str', name: 'Strength',  icon: '💪' },   // 力量
-      { id: 'agi', name: 'Agility',   icon: '💨' },   // 敏捷
-      { id: 'vit', name: 'Vitality',  icon: '❤️' },   // 体力
-      { id: 'end', name: 'Endurance', icon: '🛡️' },   // 耐力
-      { id: 'luk', name: 'Luck',      icon: '🍀' },   // 幸运
+      { id: 'str', name: 'Strength',  icon: '💪' },   // 力量 → Attack
+      { id: 'agi', name: 'Agility',   icon: '💨' },   // 敏捷 → Speed (how fast the action gauge fills)
+      { id: 'vit', name: 'Vitality',  icon: '❤️' },   // 体力 → HP
+      { id: 'end', name: 'Toughness', icon: '🛡️' },   // 耐力 → Defense (% of damage blocked)
+      { id: 'luk', name: 'Luck',      icon: '🍀' },   // 幸运 → Critical hits, Dodge (and later: loot)
     ],
+    // Battle numbers made from the stats (gauge + turn battles).
+    // These were balanced by simulating many fights: one extra point is worth
+    // about the same in every stat.
+    combat: {
+      attackBase: 25,   attackPerStr: 1,      // Attack  = 25 + 1 x Strength
+      hpBase: 100,      hpPerVit: 4,          // HP      = 100 + 4 x Vitality
+      defenseSoft: 25,                        // Defense = Toughness / (Toughness + 25)  → 10: 29%, 20: 44%, 40: 62%
+      speedBase: 60,    speedPerAgi: 2,       // Speed   = 60 + 2 x Agility (gauge filled per beat)
+      gaugeFull: 1000,                        // a full gauge = one attack (Speed 100 → every 10 beats)
+      critPerLuk: 0.012, critMax: 0.5,        // Crit    = 1.2% x Luck (max 50%)
+      critDamage: 1.8,                        //   a critical hit does x1.8 damage
+      dodgePerLuk: 0.008, dodgeMax: 0.3,      // Dodge   = 0.8% x Luck (max 30%)
+      damageSpread: 0.1,                      // each hit: Attack x (1 - Defense) x 0.9..1.1
+    },
     baseEach: 10,       // every stat starts at this (5 x 10 = 50 fixed points)
     randomPoints: 50,   // then this many points go, one by one, to random stats (total 100)
     // The species an egg can hatch into (equal chance each).

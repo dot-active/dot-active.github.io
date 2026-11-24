@@ -363,6 +363,34 @@ function refreshPetStatus() {
   });
 }
 
+// Battle numbers from a pet's stats (formulas in CONFIG.pets.combat).
+function petCombatStats(pet) {
+  const c = CONFIG.pets.combat, s = pet.stats;
+  return {
+    attack:  c.attackBase + c.attackPerStr * (s.str || 0),
+    hp:      c.hpBase + c.hpPerVit * (s.vit || 0),
+    defense: (s.end || 0) / ((s.end || 0) + c.defenseSoft),
+    speed:   c.speedBase + c.speedPerAgi * (s.agi || 0),
+    crit:    Math.min(c.critMax, c.critPerLuk * (s.luk || 0)),
+    dodge:   Math.min(c.dodgeMax, c.dodgePerLuk * (s.luk || 0)),
+  };
+}
+
+// The six battle numbers as small chips.
+function petCombatHtml(pet) {
+  const b = petCombatStats(pet), pct = v => `${Math.round(v * 100)}%`;
+  const chips = [
+    ['⚔️', Math.round(b.attack), 'Attack'],
+    ['❤️', Math.round(b.hp), 'HP'],
+    ['🛡️', pct(b.defense), 'Defense'],
+    ['💨', Math.round(b.speed), 'Speed'],
+    ['💥', pct(b.crit), 'Crit'],
+    ['🌀', pct(b.dodge), 'Dodge'],
+  ];
+  return `<div class="pet-combat">${chips.map(([icon, v, label]) =>
+    `<div class="combat-chip" title="${label}"><b>${icon} ${v}</b><span>${label}</span></div>`).join('')}</div>`;
+}
+
 function petCardHtml(pet, { rename = false, home = false } = {}) {
   const sp = CONFIG.pets.species[pet.species];
   const { stats, baseEach, randomPoints } = CONFIG.pets;
@@ -387,6 +415,7 @@ function petCardHtml(pet, { rename = false, home = false } = {}) {
         </div>
       </div>
       <div class="pet-stats">${rows}</div>
+      ${petCombatHtml(pet)}
       ${home ? petStatusHtml(pet) : ''}
     </div>`;
 }

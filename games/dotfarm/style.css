@@ -390,6 +390,25 @@ footer {
   animation: none;
 }
 @keyframes bubble-shake { 25% { margin-left: -2px; } 75% { margin-left: 2px; } }
+/* Battle numbers under the stats */
+.pet-combat {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+  margin-top: 8px;
+}
+.combat-chip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 3px 2px;
+  background: #fff8e7;
+  border-radius: 8px;
+  box-shadow: inset 0 0 0 1px #d2b48c;
+  line-height: 1.2;
+}
+.combat-chip b    { font-size: 13px; font-weight: 800; white-space: nowrap; }
+.combat-chip span { font-size: 10px; font-weight: 700; color: #7a5230; }
 .pet-status { margin-top: 6px; font-size: 12px; font-weight: 700; color: #7a5230; }
 .pet-status.hungry { color: #c62828; }
 @keyframes egg-wobble { 0%, 60%, 100% { transform: rotate(0); } 70% { transform: rotate(-12deg); } 85% { transform: rotate(12deg); } }
