@@ -119,28 +119,41 @@ const CONFIG = {
     price: 100,
   },
   pets: {
-    // The five stats, in the order they are shown, and what each one does in battle.
+    // The five stats, in the order they are shown, and what each one does.
     // (ids stay the same so old saves keep their points)
     stats: [
-      { id: 'str', name: 'Strength',  icon: '💪' },   // 力量 → Attack
-      { id: 'agi', name: 'Agility',   icon: '💨' },   // 敏捷 → Speed (how fast the action gauge fills)
-      { id: 'vit', name: 'Vitality',  icon: '❤️' },   // 体力 → HP
-      { id: 'end', name: 'Toughness', icon: '🛡️' },   // 耐力 → Defense (% of damage blocked)
-      { id: 'luk', name: 'Luck',      icon: '🍀' },   // 幸运 → Critical hits, Dodge (and later: loot)
+      { id: 'str', name: 'Strength',  icon: '💪' },   // 力量 → battle: Attack + Defense  (biggest effect in battle)
+      { id: 'agi', name: 'Agility',   icon: '💨' },   // 敏捷 → battle: Speed;  stealing: get caught less / catch thieves at home
+      { id: 'vit', name: 'Vitality',  icon: '❤️' },   // 体力 → battle: HP;  farm: eats more per meal (more XP)
+      { id: 'end', name: 'Toughness', icon: '🛡️' },   // 耐力 → battle: Defense;  stealing: more trips per day
+      { id: 'luk', name: 'Luck',      icon: '🍀' },   // 幸运 → battle: Critical hits (smallest effect);  stealing: success rate
     ],
-    // Battle numbers made from the stats (gauge + turn battles).
-    // These were balanced by simulating many fights: one extra point is worth
-    // about the same in every stat.
+    // Battle numbers made from the stats (action gauge + turn battles).
+    // Balanced by simulating many fights so Strength matters most and Luck least.
     combat: {
-      attackBase: 25,   attackPerStr: 1,      // Attack  = 25 + 1 x Strength
-      hpBase: 100,      hpPerVit: 4,          // HP      = 100 + 4 x Vitality
-      defenseSoft: 25,                        // Defense = Toughness / (Toughness + 25)  → 10: 29%, 20: 44%, 40: 62%
-      speedBase: 60,    speedPerAgi: 2,       // Speed   = 60 + 2 x Agility (gauge filled per beat)
-      gaugeFull: 1000,                        // a full gauge = one attack (Speed 100 → every 10 beats)
-      critPerLuk: 0.012, critMax: 0.5,        // Crit    = 1.2% x Luck (max 50%)
-      critDamage: 1.8,                        //   a critical hit does x1.8 damage
-      dodgePerLuk: 0.008, dodgeMax: 0.3,      // Dodge   = 0.8% x Luck (max 30%)
-      damageSpread: 0.1,                      // each hit: Attack x (1 - Defense) x 0.9..1.1
+      attackBase: 33,  attackPerStr: 0.8,        // Attack  = 33 + 0.8 x Strength
+      defensePerStr: 0.35, defensePerTough: 0.85,   // Defense points = 0.35 x Strength + 0.85 x Toughness
+      defenseSoft: 32,                           // Defense % = points / (points + 32)
+      hpBase: 100,      hpPerVit: 2.4,              // HP      = 100 + 2.4 x Vitality
+      speedBase: 60,    speedPerAgi: 0.9,           // Speed   = 60 + 0.9 x Agility (gauge filled per beat)
+      gaugeFull: 1000,                            // a full gauge = one attack
+      critPerLuk: 0.012, critMax: 0.5,            // Crit    = 1.2% x Luck (max 50%)
+      critDamage: 2,                          //   a critical hit does x2 damage
+      damageSpread: 0.1,                          // each hit: Attack x (1 - Defense %) x 0.9..1.1
+    },
+    // What the stats do outside battle.
+    life: {
+      // Vitality → food per meal (1 + 1 for every 20 Vitality: 10 → 1, 20 → 2, 40 → 3, 60 → 4)
+      mealBase: 1, vitPerExtraFood: 20,
+      xpPerFood: 1,                     // every food eaten gives this much XP
+      // Toughness → stealing trips per day (1 + 1 for every 15 Toughness: 10 → 1, 20 → 2, 30 → 3, 60 → 5)
+      stealsBase: 1, toughPerExtraSteal: 15,
+      // Luck → chance a steal works: 30% + 1% x Luck (10 → 40%, 20 → 50%, 40 → 70%), max 90%
+      stealBase: 0.3, stealPerLuk: 0.01, stealMax: 0.9,
+      // Agility → thief vs guard: chance the thief is caught =
+      //   30% + 1% x (guard Agility - thief Agility), between 5% and 90%.
+      caughtBase: 0.3, caughtPerAgi: 0.01, caughtMin: 0.05, caughtMax: 0.9,
+      averageAgi: 20,                   // pet cards show the chances against a pet with this Agility
     },
     baseEach: 10,       // every stat starts at this (5 x 10 = 50 fixed points)
     randomPoints: 50,   // then this many points go, one by one, to random stats (total 100)
@@ -196,9 +209,8 @@ const CONFIG = {
     // After hatching, the pet lives in its Pet House and needs food.
     foods: ['corn', 'meat'],        // what it eats (only one kind in the house at a time)
     maxFood: 10,                    // the most food the house holds
-    mealEveryMs: 5 * 60 * 60 * 1000, // it eats every 5 hours...
-    eatMin: 1,                      // ...between eatMin
-    eatMax: 3,                      // ...and eatMax pieces of food
+    mealEveryMs: 5 * 60 * 60 * 1000, // it eats every 5 hours
+    // how much it eats each time depends on its Vitality (see pets.life)
     // A pet left hungry too long wants to run away:
     runAwayWarnMs: 10 * 60 * 60 * 1000,  // after 10 hours hungry its bubble says it will run away...
     runAwayCheckMs: 5 * 60 * 60 * 1000,  // ...then every 5 hours...

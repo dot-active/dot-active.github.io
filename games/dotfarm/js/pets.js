@@ -183,12 +183,15 @@ function addFoodFromField(cropIndex, i) {
   return addFood(i, foodId);
 }
 
-// The pet eats eatMin..eatMax pieces (or whatever is left).
+// The pet eats as much as its Vitality allows (or whatever is left),
+// and gains XP for every piece.
 function eatMeal(t) {
-  const { eatMin, eatMax } = CONFIG.petHouse;
-  const want = eatMin + Math.floor(Math.random() * (eatMax - eatMin + 1));
-  t.food.count -= Math.min(want, t.food.count);
+  const pet = petById(t.pet);
+  const want = pet ? petLifeStats(pet).mealSize : 1;
+  const eaten = Math.min(want, t.food.count);
+  t.food.count -= eaten;
   if (t.food.count <= 0) t.food = null;   // empty: any kind of food can go in again
+  if (pet) pet.xp = (pet.xp || 0) + eaten * CONFIG.pets.life.xpPerFood;
 }
 
 function stopHunger(t) {
@@ -364,31 +367,56 @@ function refreshPetStatus() {
 }
 
 // Battle numbers from a pet's stats (formulas in CONFIG.pets.combat).
+// Battle numbers from a pet's stats (formulas in CONFIG.pets.combat).
 function petCombatStats(pet) {
   const c = CONFIG.pets.combat, s = pet.stats;
+  const str = s.str || 0, agi = s.agi || 0, vit = s.vit || 0, end = s.end || 0, luk = s.luk || 0;
+  const defPoints = c.defensePerStr * str + c.defensePerTough * end;
   return {
-    attack:  c.attackBase + c.attackPerStr * (s.str || 0),
-    hp:      c.hpBase + c.hpPerVit * (s.vit || 0),
-    defense: (s.end || 0) / ((s.end || 0) + c.defenseSoft),
-    speed:   c.speedBase + c.speedPerAgi * (s.agi || 0),
-    crit:    Math.min(c.critMax, c.critPerLuk * (s.luk || 0)),
-    dodge:   Math.min(c.dodgeMax, c.dodgePerLuk * (s.luk || 0)),
+    attack:  c.attackBase + c.attackPerStr * str,
+    defense: defPoints / (defPoints + c.defenseSoft),   // share of each hit blocked
+    hp:      c.hpBase + c.hpPerVit * vit,
+    speed:   c.speedBase + c.speedPerAgi * agi,
+    crit:    Math.min(c.critMax, c.critPerLuk * luk),
   };
 }
 
-// The six battle numbers as small chips.
+// Thief vs guard: the chance the thief gets caught (from both pets' Agility).
+function caughtChance(thiefAgi, guardAgi) {
+  const l = CONFIG.pets.life;
+  return Math.max(l.caughtMin, Math.min(l.caughtMax, l.caughtBase + l.caughtPerAgi * (guardAgi - thiefAgi)));
+}
+
+// What the stats do outside battle (formulas in CONFIG.pets.life).
+function petLifeStats(pet) {
+  const l = CONFIG.pets.life, s = pet.stats;
+  return {
+    mealSize:     l.mealBase + Math.floor((s.vit || 0) / l.vitPerExtraFood),     // Vitality
+    stealsPerDay: l.stealsBase + Math.floor((s.end || 0) / l.toughPerExtraSteal), // Toughness
+    stealSuccess: Math.min(l.stealMax, l.stealBase + l.stealPerLuk * (s.luk || 0)), // Luck
+    caught: caughtChance(s.agi || 0, l.averageAgi),   // Agility: as a thief, vs an average guard
+    catch:  caughtChance(l.averageAgi, s.agi || 0),   // Agility: as a guard, vs an average thief
+  };
+}
+
+// The battle and farm numbers as small chips.
 function petCombatHtml(pet) {
-  const b = petCombatStats(pet), pct = v => `${Math.round(v * 100)}%`;
-  const chips = [
+  const b = petCombatStats(pet), f = petLifeStats(pet), pct = v => `${Math.round(v * 100)}%`;
+  const group = (title, chips) => `<div class="chip-title">${title}</div><div class="pet-combat">${chips.map(([icon, v, label]) =>
+    `<div class="combat-chip" title="${label}"><b>${icon} ${v}</b><span>${label}</span></div>`).join('')}</div>`;
+  return group('Battle', [
     ['⚔️', Math.round(b.attack), 'Attack'],
-    ['❤️', Math.round(b.hp), 'HP'],
     ['🛡️', pct(b.defense), 'Defense'],
+    ['❤️', Math.round(b.hp), 'HP'],
     ['💨', Math.round(b.speed), 'Speed'],
     ['💥', pct(b.crit), 'Crit'],
-    ['🌀', pct(b.dodge), 'Dodge'],
-  ];
-  return `<div class="pet-combat">${chips.map(([icon, v, label]) =>
-    `<div class="combat-chip" title="${label}"><b>${icon} ${v}</b><span>${label}</span></div>`).join('')}</div>`;
+  ]) + group('Farm & stealing', [
+    ['🍽️', f.mealSize, 'Food / meal'],
+    ['🎒', f.stealsPerDay, 'Steals / day'],
+    ['🍀', pct(f.stealSuccess), 'Steal works'],
+    ['🥷', pct(f.caught), 'Gets caught'],
+    ['👀', pct(f.catch), 'Catches thief'],
+  ]);
 }
 
 function petCardHtml(pet, { rename = false, home = false } = {}) {
@@ -411,7 +439,7 @@ function petCardHtml(pet, { rename = false, home = false } = {}) {
           <div class="pet-name">${escapeHtml(pet.name)}${rename
             ? ` <button class="pet-rename" data-pet="${pet.id}" aria-label="Rename" title="Rename">✏️</button>` : ''}</div>
           <div class="pet-kind">${sp.kind}</div>
-          <div class="pet-total">Total ${total}</div>
+          <div class="pet-total">Total ${total} · ⭐ ${pet.xp || 0} XP</div>
         </div>
       </div>
       <div class="pet-stats">${rows}</div>
