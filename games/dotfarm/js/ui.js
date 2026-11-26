@@ -76,11 +76,34 @@ function startIconDrag(e, sourceEl, icon, handlers) {
 
   sourceEl.setPointerCapture(e.pointerId);
 
+  let lastX = e.clientX, lastY = e.clientY;
   const onMove = ev => {
+    lastX = ev.clientX; lastY = ev.clientY;
     moveGhost(ev.clientX, ev.clientY);
     if (handlers.over) handlers.over(ev.clientX, ev.clientY);
   };
+  // Holding the item near the left/right edge of the field area scrolls the
+  // field (on phones it is wider than the screen).
+  let scrolling = true;
+  const autoScroll = () => {
+    if (!scrolling) return;
+    const main = document.querySelector('main');
+    const r = main.getBoundingClientRect(), edge = 48;
+    let dx = 0;
+    if (lastY > r.top && lastY < r.bottom) {
+      if (lastX < r.left + edge) dx = -Math.ceil((r.left + edge - lastX) / 4);
+      else if (lastX > r.right - edge) dx = Math.ceil((lastX - (r.right - edge)) / 4);
+    }
+    if (dx && main.scrollWidth > main.clientWidth) {
+      const before = main.scrollLeft;
+      main.scrollLeft += dx;
+      if (main.scrollLeft !== before && handlers.over) handlers.over(lastX, lastY);
+    }
+    requestAnimationFrame(autoScroll);
+  };
+  requestAnimationFrame(autoScroll);
   const finish = (ev, cancelled) => {
+    scrolling = false;
     sourceEl.removeEventListener('pointermove', onMove);
     sourceEl.removeEventListener('pointerup', onUp);
     sourceEl.removeEventListener('pointercancel', onCancel);

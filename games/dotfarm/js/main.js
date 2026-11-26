@@ -60,6 +60,8 @@ function setupInput() {
   // Field: tap a tile for its menu; drag ripe crops (to the Market or Storage)
   // and big animals / pen products (to Storage).
   $('field').addEventListener('pointerdown', onFieldPointerDown);
+  // The field scrolls sideways on phones: the tile menu would be left behind.
+  document.querySelector('main').addEventListener('scroll', closeTileMenu, { passive: true });
 
   // Tile menu: buttons; a press anywhere else closes it.
   $('tile-menu').addEventListener('click', onTileMenuClick);

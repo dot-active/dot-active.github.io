@@ -95,6 +95,10 @@ function renderTile(i) {
   el.classList.toggle('runaway', !!tile.pet && isRunningAway(tile));   // "I'm running away!" bubble
   el.classList.toggle('baby', baby);
   el.classList.toggle('pen-empty', penEmpty);
+  // Something here can be picked up and dragged. On phones the other tiles
+  // let a sideways swipe scroll the field instead (see style.css).
+  el.classList.toggle('grab', !!(tile.product || tile.output ||
+    (tile.animal && isGrown(tile)) || (tile.crop && !tile.building && isRipe(tile))));
   // Only touch the DOM when something changed.
   const iconEl = el.children[0], timerEl = el.children[1];
   if (iconEl.textContent !== icon) iconEl.textContent = icon;

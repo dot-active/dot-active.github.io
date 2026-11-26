@@ -656,3 +656,42 @@ footer {
 }
 @keyframes hatch-pop { from { transform: scale(.4); opacity: 0; } }
 @keyframes hatch-wobble { 25% { transform: rotate(-10deg); } 75% { transform: rotate(10deg); } }
+
+/* =========================================================
+   PHONES — the field fills the height between header and
+   toolbar and scrolls sideways; windows show 2 items per row.
+   ========================================================= */
+@media (max-width: 700px) {
+  :root {
+    --header-h: 56px;
+    --footer-h: 80px;
+    --slot-cols: 2;
+    --slot-w: 128px;
+    --slot-h: 100px;
+  }
+  .title { font-size: 19px; }
+  .coins { font-size: 22px; padding: 4px 12px; }
+
+  main {
+    justify-content: flex-start;
+    overflow-x: auto;
+    overflow-y: hidden;
+    overscroll-behavior: contain;
+    touch-action: pan-x;            /* swipe sideways to see the rest of the field */
+    padding: 8px;
+    scrollbar-width: thin;
+  }
+  .field {
+    flex: none;
+    height: 100%;                   /* 100% of the space between header and toolbar */
+    width: auto;
+    margin: 0 auto;                 /* centred when it does fit (e.g. phone held sideways) */
+  }
+  .tile { touch-action: pan-x; }    /* a swipe on a tile scrolls the field... */
+  .tile.grab { touch-action: none; }/* ...unless there is something on it to drag */
+
+  /* Shop / Build / Storage: 2 bigger items per row */
+  .shop-item .icon  { font-size: 42px; }
+  .shop-item .name,
+  .shop-item .price { font-size: 13px; }
+}
