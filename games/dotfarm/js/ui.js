@@ -82,22 +82,25 @@ function startIconDrag(e, sourceEl, icon, handlers) {
     moveGhost(ev.clientX, ev.clientY);
     if (handlers.over) handlers.over(ev.clientX, ev.clientY);
   };
-  // Holding the item near the left/right edge of the field area scrolls the
-  // field (on phones it is wider than the screen).
+  // Holding the item near an edge of the field area scrolls the field
+  // (on phones it is bigger than the screen).
   let scrolling = true;
   const autoScroll = () => {
     if (!scrolling) return;
     const main = document.querySelector('main');
     const r = main.getBoundingClientRect(), edge = 48;
-    let dx = 0;
-    if (lastY > r.top && lastY < r.bottom) {
+    let dx = 0, dy = 0;
+    if (lastY > r.top && lastY < r.bottom && lastX > r.left && lastX < r.right) {
       if (lastX < r.left + edge) dx = -Math.ceil((r.left + edge - lastX) / 4);
       else if (lastX > r.right - edge) dx = Math.ceil((lastX - (r.right - edge)) / 4);
+      if (lastY < r.top + edge) dy = -Math.ceil((r.top + edge - lastY) / 4);
+      else if (lastY > r.bottom - edge) dy = Math.ceil((lastY - (r.bottom - edge)) / 4);
     }
-    if (dx && main.scrollWidth > main.clientWidth) {
-      const before = main.scrollLeft;
+    if (dx || dy) {
+      const bx = main.scrollLeft, by = main.scrollTop;
       main.scrollLeft += dx;
-      if (main.scrollLeft !== before && handlers.over) handlers.over(lastX, lastY);
+      main.scrollTop += dy;
+      if ((main.scrollLeft !== bx || main.scrollTop !== by) && handlers.over) handlers.over(lastX, lastY);
     }
     requestAnimationFrame(autoScroll);
   };

@@ -695,3 +695,53 @@ footer {
   .shop-item .name,
   .shop-item .price { font-size: 13px; }
 }
+
+/* =========================================================
+   PHONES HELD SIDEWAYS (short screens) — big tiles; the field
+   scrolls both up/down and left/right; thinner bars.
+   ========================================================= */
+@media (max-height: 500px) {
+  :root {
+    --header-h: 44px;
+    --footer-h: 56px;
+    --tile-size: 80px;              /* each field tile is about this big */
+    --slot-cols: 4;                 /* windows have room for 4 per row here */
+    --slot-w: 76px;
+    --slot-h: 84px;
+  }
+  .title { font-size: 17px; }
+  .coins { font-size: 18px; padding: 2px 12px; }
+
+  main {
+    display: flex;
+    justify-content: flex-start;
+    align-items: flex-start;
+    overflow: auto;
+    overscroll-behavior: contain;
+    touch-action: pan-x pan-y;      /* swipe any way to move around the field */
+    padding: 8px;
+    scrollbar-width: thin;
+  }
+  .field {
+    flex: none;
+    width: calc(var(--cols) * var(--tile-size));
+    height: auto;
+    margin: auto;                   /* centred when it fits, scrolls from the start when it doesn't */
+  }
+  .tile { touch-action: pan-x pan-y; }
+  .tile.grab { touch-action: none; }
+
+  /* Toolbar: icon and label side by side, so it can be thinner */
+  .tool-btn {
+    flex-direction: row;
+    justify-content: center;
+    gap: 6px;
+    width: auto;
+    min-width: 0;
+    padding: 6px 12px;
+  }
+  .tool-btn .icon { font-size: 24px; }
+  .shop-item .icon  { font-size: 34px; }
+  .shop-item .name,
+  .shop-item .price { font-size: 12px; }
+}
