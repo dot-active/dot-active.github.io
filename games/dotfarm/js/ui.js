@@ -322,6 +322,56 @@ function startOutputDrag(tileEl, e) {
   });
 }
 
+/* ---------- Goods bought in the Shop (Wool, Meat) ---------- */
+// Pay for one, if there are enough coins.
+function payForShopGoods(id) {
+  const price = CONFIG.shopGoods[id];
+  if (state.coins < price) { showToast('Not enough coins! 🪙'); return false; }
+  state.coins -= price;
+  renderCoins();
+  return true;
+}
+
+// Drop into Storage, onto a Pet House egg (Wool), or onto a pet's house (food).
+function startBuyGoodsDrag(item, e) {
+  const id = item.dataset.buy;
+  const storage = $('storage-window');
+  startIconDrag(e, item, goodsInfo(id).icon, {
+    over(x, y) {
+      storage.classList.toggle('drop-target', isOverStorage(x, y));
+      highlightFeedTarget(id, x, y);   // Pet House: green if it can take it
+    },
+    end() {
+      storage.classList.remove('drop-target');
+      clearDropHighlight();
+    },
+    drop(x, y) {
+      if (isOverStorage(x, y)) {
+        if (state.coins < CONFIG.shopGoods[id]) { showToast('Not enough coins! 🪙'); return false; }
+        if (!roomInStorage(id)) return false;
+        payForShopGoods(id);
+        state.storage[id] = (state.storage[id] || 0) + 1;
+        renderStorage();
+        showToast(`${goodsInfo(id).icon} Stored!`);
+        saveGame();
+        return true;
+      }
+      const i = tileIndexAt(x, y);
+      if (i < 0) return false;
+      if (id === CONFIG.petHouse.fuel && canAddWool(i)) {
+        if (!payForShopGoods(id)) return false;
+        startIncubating(i);
+        return true;
+      }
+      if (canAddFood(i, id)) {
+        if (!payForShopGoods(id)) return false;
+        return addFood(i, id);
+      }
+      return false;
+    },
+  });
+}
+
 /* ---------- Stored things: Storage → Market (goods) or → a tile (Fertilizer, Baby Pig) ---------- */
 function startStorageDrag(row, e) {
   const id = row.dataset.goods;

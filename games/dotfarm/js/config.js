@@ -110,6 +110,14 @@ const CONFIG = {
     workTimeMs: 10 * 60 * 1000,   // how long it takes (10 minutes)
   },
 
+  // --- Goods you can also buy in the Shop (coins each) ---
+  // Keep these above the best Market price (basePrice + priceSwing) so buying
+  // and selling straight back never makes money.
+  shopGoods: {
+    wool: 30,   // Market pays 20 ± 30% (14..26)
+    meat: 25,   // Market pays 15 ± 30% (11..20)
+  },
+
   // --- Pets ---
   // Buy a Pet Egg in the Shop and drag it into a Pet House (Build window).
   // Then add Wool to keep it warm: it hatches into one of the species below, picked at random.

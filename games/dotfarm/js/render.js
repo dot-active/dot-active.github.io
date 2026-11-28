@@ -194,6 +194,12 @@ function renderShop() {
     const f = CONFIG[key];
     list.appendChild(makeSlot(f.icon, f.name, `🪙 ${f.price}`, { item: key }));
   });
+
+  // Goods (Wool, Meat): data-buy is the goods id.
+  Object.entries(CONFIG.shopGoods).forEach(([id, price]) => {
+    const g = goodsInfo(id);
+    if (g) list.appendChild(makeSlot(g.icon, g.name, `🪙 ${price}`, { buy: id }));
+  });
   fillEmptySlots(list);
 }
 

@@ -32,6 +32,8 @@ function setupInput() {
       startTileItemDrag(item, e, CONFIG.newLand.icon, canUnlockLand, unlockLand);
     else if (item.dataset.item === 'petEgg')
       startEggDrag(item, e);
+    else if (item.dataset.buy)
+      startBuyGoodsDrag(item, e);
   }
 
   // Market window: drag by title, close button.
